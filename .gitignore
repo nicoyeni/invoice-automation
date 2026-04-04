@@ -1,0 +1,30 @@
+# Config with secrets — never commit these
+config/config.yaml
+config/credentials.json
+config/token.json
+config/token_gmail.json
+config/token_sheets.json
+config/token_drive.json
+
+# Runtime data (use Railway volume or Render disk)
+data/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Logs
+logs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp

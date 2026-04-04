@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  invoice-processor:
+    build: .
+    container_name: invoice-automation
+    restart: unless-stopped
+    volumes:
+      # Mount config so you can edit without rebuilding
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - TZ=America/Los_Angeles

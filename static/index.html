@@ -1,0 +1,2036 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>InvoiceAI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Status Pills ── */
+    .pill-pending      { background:#fef9c3; color:#854d0e; }
+    .pill-under_review { background:#f3e8ff; color:#6b21a8; }
+    .pill-flagged      { background:#fee2e2; color:#991b1b; }
+    .pill-approved     { background:#dcfce7; color:#166534; }
+    .pill-paid         { background:#dbeafe; color:#1e40af; }
+    .pill-overdue      { background:#fce7f3; color:#9d174d; }
+
+    /* ── Dark Mode ── */
+    html.dark { color-scheme: dark; }
+    html.dark body                      { background:#0f172a; color:#e2e8f0; }
+    html.dark .bg-white                 { background:#1e293b !important; }
+    html.dark .bg-gray-50               { background:#0f172a !important; }
+    html.dark .bg-gray-100              { background:#1e293b !important; }
+    html.dark .bg-gray-200              { background:#334155 !important; }
+    html.dark .border, html.dark .border-b, html.dark .border-t { border-color:#334155 !important; }
+    html.dark .text-gray-900            { color:#f1f5f9 !important; }
+    html.dark .text-gray-700            { color:#cbd5e1 !important; }
+    html.dark .text-gray-600            { color:#94a3b8 !important; }
+    html.dark .text-gray-500            { color:#64748b !important; }
+    html.dark .text-gray-400            { color:#475569 !important; }
+    html.dark .shadow-sm                { box-shadow:0 1px 2px rgba(0,0,0,.4) !important; }
+    html.dark .shadow-2xl               { box-shadow:0 25px 50px rgba(0,0,0,.6) !important; }
+    html.dark tr:hover                  { background:#1e293b !important; }
+    html.dark .hover\:bg-gray-50:hover  { background:#1e293b !important; }
+    html.dark .hover\:bg-gray-100:hover { background:#334155 !important; }
+    html.dark input, html.dark select, html.dark textarea { background:#1e293b; color:#e2e8f0; border-color:#334155; }
+    html.dark .bg-blue-50               { background:#172554 !important; }
+    html.dark .drop-active              { background:#1e3a5f !important; }
+    html.dark .kanban-col               { background:#1e293b !important; }
+    html.dark .kanban-card              { background:#334155 !important; border-color:#475569 !important; }
+    html.dark .cal-day:hover            { background:#334155 !important; }
+    html.dark .cal-today                { background:#1e3a5f !important; }
+    html.dark .cmd-box                  { background:#1e293b !important; }
+    html.dark .cmd-item:hover           { background:#334155 !important; }
+    html.dark .cmd-section              { color:#475569 !important; }
+    html.dark .filter-panel             { background:#1e293b !important; border-color:#334155 !important; }
+    html.dark .vendor-card              { background:#1e293b !important; }
+    html.dark .aging-card               { background:#1e293b !important; }
+
+    /* ── Misc ── */
+    .drop-active   { border-color:#2563eb !important; background:#eff6ff; }
+    th.sortable    { cursor:pointer; user-select:none; }
+    .sort-active .th-label { color:#3b82f6; }
+    .modal-tab-active { border-bottom:2px solid #3b82f6; color:#3b82f6; }
+
+    /* ── Bulk bar ── */
+    #bulk-bar { transition: transform .2s, opacity .2s; }
+    #bulk-bar.hidden { transform:translateY(100%); opacity:0; pointer-events:none; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width:5px; height:5px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
+    .scrollbar-none { scrollbar-width:none; }
+    .scrollbar-none::-webkit-scrollbar { display:none; }
+
+    /* ── Kanban ── */
+    .kanban-col  { background:#f8fafc; border-radius:12px; min-height:400px; }
+    .kanban-card { cursor:grab; transition: box-shadow .15s, transform .1s; }
+    .kanban-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.1); }
+    .kanban-card.dragging { opacity:.4; transform:scale(.97); }
+    .kanban-over { outline:2px dashed #3b82f6; outline-offset:2px; }
+
+    /* ── Calendar ── */
+    .cal-day { border-radius:8px; min-height:72px; transition:background .1s; }
+    .cal-day:hover { background:#f1f5f9; cursor:pointer; }
+    .cal-today { background:#eff6ff; }
+    .cal-other { opacity:.35; pointer-events:none; }
+
+    /* ── Command palette ── */
+    #cmd-backdrop { backdrop-filter:blur(4px); }
+    .cmd-box  { background:white; border-radius:14px; }
+    .cmd-item { transition:background .08s; }
+    .cmd-section { font-size:.65rem; font-weight:600; color:#94a3b8; text-transform:uppercase; letter-spacing:.08em; }
+
+    /* ── Filter panel ── */
+    .filter-panel { background:white; border:1px solid #e2e8f0; border-radius:12px; animation:slideDown .18s ease; }
+    @keyframes slideDown { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+    /* ── Vendor card ── */
+    .vendor-card { transition: box-shadow .15s, transform .15s; }
+    .vendor-card:hover { box-shadow:0 4px 20px rgba(0,0,0,.1); transform:translateY(-1px); }
+
+    /* ── Aging card ── */
+    .aging-card { transition: box-shadow .15s; }
+
+    /* ── Budget bar ── */
+    .budget-bar { transition: width .5s ease; }
+
+    /* ── Mobile ── */
+    @media (max-width:640px) {
+      .hide-sm { display:none !important; }
+      table td:nth-child(4), table th:nth-child(4),
+      table td:nth-child(5), table th:nth-child(5),
+      table td:nth-child(7), table th:nth-child(7) { display:none; }
+    }
+
+    /* ── Progress upload ── */
+    .upload-prog { transition: width .2s; }
+
+    /* ── Tag chip ── */
+    .tag-chip { background:#e0f2fe; color:#0369a1; border-radius:999px; font-size:.7rem; padding:1px 8px; }
+    html.dark .tag-chip { background:#1e3a5f; color:#93c5fd; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans">
+
+<!-- ══ Header ══════════════════════════════════════════════════════════════════ -->
+<header class="bg-white border-b shadow-sm px-4 py-2 flex items-center justify-between sticky top-0 z-30">
+  <div class="flex items-center gap-2 min-w-0">
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <span class="text-xl">🧾</span>
+      <span class="font-bold text-gray-900 text-base hidden sm:block">Invoice<span class="text-blue-600">AI</span></span>
+    </div>
+    <nav class="flex gap-0.5 ml-2 overflow-x-auto scrollbar-none">
+      <button onclick="setView('dashboard')" id="nav-dashboard" class="nav-btn flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="3" width="7" height="7" rx="1" stroke-width="2"/><rect x="3" y="14" width="7" height="7" rx="1" stroke-width="2"/><rect x="14" y="14" width="7" height="7" rx="1" stroke-width="2"/></svg>
+        <span class="hidden sm:inline">Dashboard</span>
+      </button>
+      <button onclick="setView('calendar')" id="nav-calendar" class="nav-btn flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" stroke-width="2"/><path stroke-linecap="round" stroke-width="2" d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <span class="hidden sm:inline">Calendar</span>
+      </button>
+      <button onclick="setView('kanban')" id="nav-kanban" class="nav-btn flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="3" width="6" height="18" rx="1" stroke-width="2"/><rect x="9" y="3" width="6" height="12" rx="1" stroke-width="2"/><rect x="16" y="3" width="6" height="15" rx="1" stroke-width="2"/></svg>
+        <span class="hidden sm:inline">Kanban</span>
+      </button>
+      <button onclick="setView('analytics')" id="nav-analytics" class="nav-btn flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        <span class="hidden sm:inline">Analytics</span>
+      </button>
+      <button onclick="setView('vendors')" id="nav-vendors" class="nav-btn flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+        <span class="hidden sm:inline">Vendors</span>
+      </button>
+      <button onclick="setView('aging')" id="nav-aging" class="nav-btn flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-width="2" d="M12 6v6l4 2"/></svg>
+        <span class="hidden sm:inline">Aging</span>
+      </button>
+      <button onclick="setView('settings')" id="nav-settings" class="nav-btn flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition whitespace-nowrap">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3" stroke-width="2"/></svg>
+        <span class="hidden sm:inline">Settings</span>
+      </button>
+    </nav>
+  </div>
+  <div class="flex items-center gap-2 flex-shrink-0">
+    <span id="processing-badge" class="hidden text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium animate-pulse">Processing…</span>
+    <span class="flex items-center gap-1 text-xs text-gray-500">
+      <span class="w-2 h-2 rounded-full bg-gray-300" id="dot"></span>
+      <span id="status-text" class="hidden sm:inline">Connecting…</span>
+    </span>
+    <button onclick="openCmdPalette()" title="Command Palette ⌘K"
+      class="hidden sm:flex items-center gap-1.5 border rounded-lg px-2 py-1.5 text-xs text-gray-400 hover:bg-gray-50 hover:text-gray-600 transition">
+      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <kbd class="font-mono">⌘K</kbd>
+    </button>
+    <button onclick="toggleDark()" title="Toggle dark mode" class="p-1.5 rounded-lg hover:bg-gray-100 transition text-gray-500">
+      <svg id="icon-sun" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+      <svg id="icon-moon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+    </button>
+    <a href="/docs" target="_blank" class="text-xs text-gray-400 hover:text-gray-600 hidden sm:block">API</a>
+  </div>
+</header>
+
+<!-- ══ Main ════════════════════════════════════════════════════════════════════ -->
+<main class="max-w-7xl mx-auto px-4 py-5">
+
+<!-- ── DASHBOARD VIEW ─────────────────────────────────────────────────────────── -->
+<div id="view-dashboard" class="space-y-4">
+  <!-- Stats -->
+  <div class="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-2">
+    <div class="bg-white rounded-xl border p-3 shadow-sm">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Total</p>
+      <p id="stat-total" class="text-2xl font-bold text-gray-900">—</p>
+    </div>
+    <div class="bg-white rounded-xl border p-3 shadow-sm col-span-2 sm:col-span-1">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Amount</p>
+      <p id="stat-amount" class="text-xl font-bold text-gray-900 truncate">—</p>
+    </div>
+    <div class="bg-white rounded-xl border p-3 shadow-sm">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Pending</p>
+      <p id="stat-pending" class="text-2xl font-bold text-yellow-600">—</p>
+    </div>
+    <div class="bg-white rounded-xl border p-3 shadow-sm">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Flagged</p>
+      <p id="stat-flagged" class="text-2xl font-bold text-red-600">—</p>
+    </div>
+    <div class="bg-white rounded-xl border p-3 shadow-sm hide-sm">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Overdue</p>
+      <p id="stat-overdue" class="text-2xl font-bold text-pink-600">—</p>
+    </div>
+    <div class="bg-white rounded-xl border p-3 shadow-sm hide-sm">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Review</p>
+      <p id="stat-review" class="text-2xl font-bold text-purple-600">—</p>
+    </div>
+    <div class="bg-white rounded-xl border p-3 shadow-sm hide-sm">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Paid</p>
+      <p id="stat-paid" class="text-2xl font-bold text-blue-600">—</p>
+    </div>
+  </div>
+
+  <!-- Action bar -->
+  <div class="flex flex-wrap gap-2 items-center">
+    <button id="btn-process" onclick="triggerProcessing()"
+      class="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-3.5 py-2 rounded-lg shadow-sm transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      Run Cycle
+    </button>
+    <!-- Single upload -->
+    <label id="upload-label" ondragover="event.preventDefault();this.classList.add('drop-active')" ondragleave="this.classList.remove('drop-active')" ondrop="handleDrop(event)"
+      class="flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-3.5 py-2 rounded-lg border shadow-sm cursor-pointer transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+      Upload
+      <input id="upload-input" type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" onchange="uploadFile(this.files[0])">
+    </label>
+    <!-- Batch upload -->
+    <label class="flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-3.5 py-2 rounded-lg border shadow-sm cursor-pointer transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      Batch
+      <input type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" multiple onchange="batchUpload(this.files)">
+    </label>
+    <button onclick="exportCSV()"
+      class="flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-3.5 py-2 rounded-lg border shadow-sm transition">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+      CSV
+    </button>
+    <button onclick="exportAccounting()"
+      class="flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-3.5 py-2 rounded-lg border shadow-sm transition hide-sm">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+      QuickBooks
+    </button>
+    <button onclick="toggleFilterPanel()"
+      class="flex items-center gap-1.5 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-3.5 py-2 rounded-lg border shadow-sm transition" id="btn-filter">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+      Filters
+    </button>
+    <span id="upload-status" class="text-sm text-gray-500 hidden"></span>
+    <div class="ml-auto text-xs text-gray-400 hide-sm"><span id="last-run-text"></span></div>
+  </div>
+
+  <!-- Saved filter tags -->
+  <div id="saved-filter-strip" class="hidden flex-wrap gap-1.5 items-center"></div>
+
+  <!-- Advanced filter panel -->
+  <div id="filter-panel" class="hidden filter-panel p-4">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div>
+        <label class="text-xs font-medium text-gray-500 block mb-1">Date From</label>
+        <input type="date" id="f-date-from" oninput="applyAdvFilters()" class="w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-500 block mb-1">Date To</label>
+        <input type="date" id="f-date-to" oninput="applyAdvFilters()" class="w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-500 block mb-1">Min Amount</label>
+        <input type="number" id="f-amt-min" placeholder="0" oninput="applyAdvFilters()" class="w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-500 block mb-1">Max Amount</label>
+        <input type="number" id="f-amt-max" placeholder="∞" oninput="applyAdvFilters()" class="w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-500 block mb-1">Category</label>
+        <input type="text" id="f-category" placeholder="e.g. Software" oninput="applyAdvFilters()" class="w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div>
+        <label class="text-xs font-medium text-gray-500 block mb-1">Flags</label>
+        <select id="f-flags" onchange="applyAdvFilters()" class="w-full border rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">Any</option>
+          <option value="has">Has flags</option>
+          <option value="none">No flags</option>
+          <option value="DUPLICATE">Duplicate</option>
+          <option value="HIGH_AMOUNT">High Amount</option>
+          <option value="OVERDUE">Overdue</option>
+          <option value="RECURRING">Recurring</option>
+          <option value="LOW_CONFIDENCE">Low Confidence</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex items-center gap-3 mt-3">
+      <button onclick="clearAdvFilters()" class="text-xs text-gray-500 hover:text-red-500 transition">Clear filters</button>
+      <button onclick="saveCurrentFilter()" class="text-xs text-blue-600 hover:text-blue-700 transition font-medium">Save as…</button>
+    </div>
+  </div>
+
+  <!-- Batch upload progress -->
+  <div id="batch-progress" class="hidden bg-white border rounded-xl p-4 shadow-sm">
+    <p class="text-sm font-semibold text-gray-700 mb-3">Batch Upload Progress</p>
+    <div id="batch-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
+  </div>
+
+  <!-- Search + status tabs -->
+  <div class="space-y-2">
+    <div class="relative">
+      <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input id="search-input" type="text" placeholder="Search vendor, invoice #, category… (press / to focus)"
+        oninput="onSearch(this.value)"
+        class="w-full pl-9 pr-4 py-2 text-sm border rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+    </div>
+    <div class="flex gap-0.5 border-b overflow-x-auto scrollbar-none">
+      <button onclick="setFilter('all')"          id="tab-all"          class="tab-btn tab-active whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600">All</button>
+      <button onclick="setFilter('pending')"      id="tab-pending"      class="tab-btn whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">Pending</button>
+      <button onclick="setFilter('under_review')" id="tab-under_review" class="tab-btn whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">Review</button>
+      <button onclick="setFilter('flagged')"      id="tab-flagged"      class="tab-btn whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">Flagged</button>
+      <button onclick="setFilter('approved')"     id="tab-approved"     class="tab-btn whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">Approved</button>
+      <button onclick="setFilter('paid')"         id="tab-paid"         class="tab-btn whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">Paid</button>
+      <button onclick="setFilter('overdue')"      id="tab-overdue"      class="tab-btn whitespace-nowrap px-3 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">Overdue</button>
+    </div>
+  </div>
+
+  <!-- Invoice table -->
+  <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b">
+          <tr>
+            <th class="px-3 py-3 w-8"><input type="checkbox" id="select-all" onchange="toggleSelectAll(this.checked)" class="rounded"/></th>
+            <th class="sortable text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" onclick="setSort('vendor_name')"><span class="th-label">Vendor</span><span id="sort-vendor_name" class="text-blue-500 ml-1"></span></th>
+            <th class="sortable text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" onclick="setSort('invoice_number')"><span class="th-label">Invoice #</span><span id="sort-invoice_number" class="text-blue-500 ml-1"></span></th>
+            <th class="sortable text-right px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" onclick="setSort('total_amount')"><span class="th-label">Amount</span><span id="sort-total_amount" class="text-blue-500 ml-1"></span></th>
+            <th class="sortable text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" onclick="setSort('invoice_date')"><span class="th-label">Date</span><span id="sort-invoice_date" class="text-blue-500 ml-1"></span></th>
+            <th class="sortable text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" onclick="setSort('due_date')"><span class="th-label">Due</span><span id="sort-due_date" class="text-blue-500 ml-1"></span></th>
+            <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hide-sm">Conf.</th>
+            <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+            <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hide-sm">Tags</th>
+            <th class="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide hide-sm">Flags</th>
+            <th class="px-3 py-3 w-8"></th>
+          </tr>
+        </thead>
+        <tbody id="invoice-tbody">
+          <tr><td colspan="11" class="px-4 py-16 text-center" id="empty-state">
+            <div class="max-w-xs mx-auto">
+              <div class="text-5xl mb-3">📄</div>
+              <p class="text-gray-600 font-medium mb-1">No invoices yet</p>
+              <p class="text-gray-400 text-sm">Upload a PDF or run a Gmail processing cycle to get started.</p>
+              <div class="flex justify-center gap-2 mt-4">
+                <label class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+                  Upload Invoice<input type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" onchange="uploadFile(this.files[0])">
+                </label>
+                <button onclick="triggerProcessing()" class="bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg border transition">
+                  Run Cycle
+                </button>
+              </div>
+            </div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── CALENDAR VIEW ────────────────────────────────────────────────────────── -->
+<div id="view-calendar" class="hidden space-y-4">
+  <div class="flex items-center justify-between">
+    <h2 id="cal-month-label" class="text-lg font-bold text-gray-900">—</h2>
+    <div class="flex gap-2">
+      <button onclick="calNav(-1)" class="p-2 rounded-lg border hover:bg-gray-50 transition">
+        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      </button>
+      <button onclick="calToday()" class="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 transition text-gray-600 font-medium">Today</button>
+      <button onclick="calNav(1)" class="p-2 rounded-lg border hover:bg-gray-50 transition">
+        <svg class="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+    <div class="grid grid-cols-7 border-b">
+      <div class="px-3 py-2 text-xs font-semibold text-gray-400 text-center">Sun</div>
+      <div class="px-3 py-2 text-xs font-semibold text-gray-400 text-center">Mon</div>
+      <div class="px-3 py-2 text-xs font-semibold text-gray-400 text-center">Tue</div>
+      <div class="px-3 py-2 text-xs font-semibold text-gray-400 text-center">Wed</div>
+      <div class="px-3 py-2 text-xs font-semibold text-gray-400 text-center">Thu</div>
+      <div class="px-3 py-2 text-xs font-semibold text-gray-400 text-center">Fri</div>
+      <div class="px-3 py-2 text-xs font-semibold text-gray-400 text-center">Sat</div>
+    </div>
+    <div id="cal-grid" class="grid grid-cols-7"></div>
+  </div>
+  <!-- Day popover -->
+  <div id="cal-popover" class="hidden bg-white border rounded-xl shadow-2xl p-4 absolute z-20 w-72" style="top:0;left:0"></div>
+</div>
+
+<!-- ── KANBAN VIEW ──────────────────────────────────────────────────────────── -->
+<div id="view-kanban" class="hidden">
+  <div class="flex gap-3 overflow-x-auto pb-4">
+    <div id="kcol-pending"      class="kanban-col flex-shrink-0 w-64 p-3" ondragover="onKanbanOver(event,'pending')"      ondrop="onKanbanDrop(event,'pending')"      ondragleave="onKanbanLeave(event)"></div>
+    <div id="kcol-under_review" class="kanban-col flex-shrink-0 w-64 p-3" ondragover="onKanbanOver(event,'under_review')" ondrop="onKanbanDrop(event,'under_review')" ondragleave="onKanbanLeave(event)"></div>
+    <div id="kcol-flagged"      class="kanban-col flex-shrink-0 w-64 p-3" ondragover="onKanbanOver(event,'flagged')"      ondrop="onKanbanDrop(event,'flagged')"      ondragleave="onKanbanLeave(event)"></div>
+    <div id="kcol-approved"     class="kanban-col flex-shrink-0 w-64 p-3" ondragover="onKanbanOver(event,'approved')"     ondrop="onKanbanDrop(event,'approved')"     ondragleave="onKanbanLeave(event)"></div>
+    <div id="kcol-paid"         class="kanban-col flex-shrink-0 w-64 p-3" ondragover="onKanbanOver(event,'paid')"         ondrop="onKanbanDrop(event,'paid')"         ondragleave="onKanbanLeave(event)"></div>
+    <div id="kcol-overdue"      class="kanban-col flex-shrink-0 w-64 p-3" ondragover="onKanbanOver(event,'overdue')"      ondrop="onKanbanDrop(event,'overdue')"      ondragleave="onKanbanLeave(event)"></div>
+  </div>
+</div>
+
+<!-- ── ANALYTICS VIEW ─────────────────────────────────────────────────────── -->
+<div id="view-analytics" class="hidden space-y-5">
+  <!-- Summary cards -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div class="bg-white rounded-xl border p-4 shadow-sm"><p class="text-xs text-gray-500 uppercase mb-1">Total Spend</p><p id="an-total" class="text-2xl font-bold text-gray-900">—</p></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm"><p class="text-xs text-gray-500 uppercase mb-1">Avg Invoice</p><p id="an-avg" class="text-2xl font-bold text-gray-900">—</p></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm"><p class="text-xs text-gray-500 uppercase mb-1">Vendors</p><p id="an-vendors" class="text-2xl font-bold text-gray-900">—</p></div>
+    <div class="bg-white rounded-xl border p-4 shadow-sm"><p class="text-xs text-gray-500 uppercase mb-1">Avg Confidence</p><p id="an-conf" class="text-2xl font-bold text-gray-900">—</p></div>
+  </div>
+  <!-- Row 1: monthly + vendor -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-xl border shadow-sm p-5"><h3 class="text-sm font-semibold text-gray-700 mb-4">Monthly Spend</h3><div class="h-52"><canvas id="chart-monthly"></canvas></div></div>
+    <div class="bg-white rounded-xl border shadow-sm p-5"><h3 class="text-sm font-semibold text-gray-700 mb-4">Vendor Breakdown</h3><div class="h-52"><canvas id="chart-vendor"></canvas></div></div>
+  </div>
+  <!-- Row 2: status + confidence -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-xl border shadow-sm p-5"><h3 class="text-sm font-semibold text-gray-700 mb-4">Status Distribution</h3><div class="h-52"><canvas id="chart-status"></canvas></div></div>
+    <div class="bg-white rounded-xl border shadow-sm p-5"><h3 class="text-sm font-semibold text-gray-700 mb-4">AI Confidence Buckets</h3><div class="h-52"><canvas id="chart-conf"></canvas></div></div>
+  </div>
+  <!-- Row 3: YoY + Forecast -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="bg-white rounded-xl border shadow-sm p-5">
+      <h3 class="text-sm font-semibold text-gray-700 mb-4">Year-over-Year</h3>
+      <div class="h-52"><canvas id="chart-yoy"></canvas></div>
+    </div>
+    <div class="bg-white rounded-xl border shadow-sm p-5">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-gray-700">Spend Forecast</h3>
+        <span id="forecast-trend" class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-500"></span>
+      </div>
+      <div class="h-52"><canvas id="chart-forecast"></canvas></div>
+    </div>
+  </div>
+  <!-- Row 4: Budget tracking -->
+  <div class="bg-white rounded-xl border shadow-sm p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-sm font-semibold text-gray-700">Budget Utilization</h3>
+      <button onclick="setView('settings')" class="text-xs text-blue-600 hover:text-blue-700 font-medium">Manage budgets →</button>
+    </div>
+    <div id="budget-list-analytics" class="space-y-3">
+      <p class="text-sm text-gray-400 text-center py-4">No budgets configured. <button onclick="setView('settings')" class="text-blue-600 hover:underline">Add one →</button></p>
+    </div>
+  </div>
+</div>
+
+<!-- ── VENDORS VIEW ──────────────────────────────────────────────────────────── -->
+<div id="view-vendors" class="hidden space-y-4">
+  <div class="flex items-center justify-between">
+    <p class="text-sm text-gray-500"><span id="vendor-count">0</span> vendors</p>
+    <input type="text" id="vendor-search" placeholder="Filter vendors…" oninput="filterVendors(this.value)"
+      class="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-48">
+  </div>
+  <div id="vendor-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+</div>
+
+<!-- ── AGING VIEW ────────────────────────────────────────────────────────────── -->
+<div id="view-aging" class="hidden space-y-5">
+  <div class="grid grid-cols-2 md:grid-cols-5 gap-3" id="aging-summary"></div>
+  <div id="aging-tables" class="space-y-4"></div>
+</div>
+
+<!-- ── SETTINGS VIEW ────────────────────────────────────────────────────────── -->
+<div id="view-settings" class="hidden space-y-6">
+  <!-- Budgets -->
+  <div class="bg-white rounded-xl border shadow-sm p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-bold text-gray-900">Budgets</h2>
+      <button onclick="toggleEl('budget-form')" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Budget</button>
+    </div>
+    <div id="budget-form" class="hidden mb-4 p-4 bg-gray-50 rounded-xl">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="text-xs font-medium text-gray-500 block mb-1">Name</label>
+          <input id="b-name" type="text" placeholder="e.g. Software Spend" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-500 block mb-1">Scope</label>
+          <select id="b-scope" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="global">Global (all invoices)</option>
+            <optgroup label="By Vendor" id="b-scope-vendors"></optgroup>
+            <optgroup label="By Category" id="b-scope-categories"></optgroup>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-500 block mb-1">Monthly Limit ($)</label>
+          <input id="b-limit" type="number" placeholder="e.g. 5000" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+      <button onclick="saveBudget()" class="mt-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Save Budget</button>
+    </div>
+    <div id="budget-table" class="space-y-2"></div>
+  </div>
+
+  <!-- Webhooks -->
+  <div class="bg-white rounded-xl border shadow-sm p-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-base font-bold text-gray-900">Webhooks</h2>
+      <button onclick="toggleEl('webhook-form')" class="text-sm text-blue-600 hover:text-blue-700 font-medium">+ Add Webhook</button>
+    </div>
+    <div id="webhook-form" class="hidden mb-4 p-4 bg-gray-50 rounded-xl">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="text-xs font-medium text-gray-500 block mb-1">Name</label>
+          <input id="w-name" type="text" placeholder="e.g. Slack Alerts" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+          <label class="text-xs font-medium text-gray-500 block mb-1">URL</label>
+          <input id="w-url" type="url" placeholder="https://hooks.slack.com/…" class="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+      <div class="mt-3">
+        <label class="text-xs font-medium text-gray-500 block mb-1">Events</label>
+        <div class="flex flex-wrap gap-2">
+          <label class="flex items-center gap-1.5 text-sm text-gray-700"><input type="checkbox" id="we-all" checked class="rounded"> All events</label>
+          <label class="flex items-center gap-1.5 text-sm text-gray-700"><input type="checkbox" id="we-created" class="rounded"> Invoice created</label>
+          <label class="flex items-center gap-1.5 text-sm text-gray-700"><input type="checkbox" id="we-status" class="rounded"> Status changed</label>
+        </div>
+      </div>
+      <div class="flex gap-2 mt-3">
+        <button onclick="saveWebhook()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Save</button>
+        <button onclick="testWebhook()" class="bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg border transition">Test</button>
+      </div>
+    </div>
+    <div id="webhook-table" class="space-y-2"></div>
+  </div>
+</div>
+
+</main>
+
+<!-- ══ Bulk Bar ═══════════════════════════════════════════════════════════════ -->
+<div id="bulk-bar" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg px-4 py-3 flex items-center gap-3 z-40">
+  <span id="bulk-count" class="text-sm font-semibold text-gray-700 flex-shrink-0"></span>
+  <div class="flex flex-wrap gap-1.5 flex-1">
+    <button onclick="bulkAction('under_review')" class="text-xs font-medium px-3 py-1.5 rounded-full bg-purple-100 text-purple-800 hover:bg-purple-200 transition">Review</button>
+    <button onclick="bulkAction('approved')"     class="text-xs font-medium px-3 py-1.5 rounded-full bg-green-100 text-green-800 hover:bg-green-200 transition">✓ Approve</button>
+    <button onclick="bulkAction('paid')"         class="text-xs font-medium px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 hover:bg-blue-200 transition">$ Paid</button>
+    <button onclick="bulkAction('flagged')"      class="text-xs font-medium px-3 py-1.5 rounded-full bg-red-100 text-red-800 hover:bg-red-200 transition">⚑ Flag</button>
+    <button onclick="bulkDelete()"               class="text-xs font-medium px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition">🗑 Delete</button>
+  </div>
+  <button onclick="clearSelection()" class="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0">Deselect all</button>
+</div>
+
+<!-- ══ Toasts ═════════════════════════════════════════════════════════════════ -->
+<div id="toast"         class="hidden fixed bottom-16 right-5 bg-red-600   text-white px-4 py-2.5 rounded-xl shadow-lg text-sm max-w-xs z-50"></div>
+<div id="toast-success" class="hidden fixed bottom-16 right-5 bg-green-600 text-white px-4 py-2.5 rounded-xl shadow-lg text-sm max-w-xs z-50"></div>
+
+<!-- ══ Invoice Detail Modal ═══════════════════════════════════════════════════ -->
+<div id="modal-backdrop" class="hidden fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-6 px-4 pb-6 overflow-y-auto" onclick="closeModal(event)">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl" onclick="event.stopPropagation()">
+    <!-- Modal header -->
+    <div class="flex items-start justify-between p-5 border-b sticky top-0 bg-white rounded-t-2xl z-10">
+      <div>
+        <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+          <h2 id="modal-inv-num" class="font-bold text-gray-900 font-mono text-base"></h2>
+          <span id="modal-status-badge" class="text-xs px-2 py-0.5 rounded-full font-medium"></span>
+        </div>
+        <p id="modal-vendor" class="text-gray-500 text-sm"></p>
+        <div id="modal-tags" class="flex flex-wrap gap-1 mt-1.5"></div>
+      </div>
+      <button onclick="_closeModal()" class="text-gray-400 hover:text-gray-600 mt-0.5">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <!-- Modal tabs -->
+    <div class="flex border-b px-5 overflow-x-auto scrollbar-none">
+      <button onclick="setModalTab('overview')" id="mtab-overview" class="modal-tab modal-tab-active text-sm font-medium px-1 py-2.5 mr-5 border-b-2 border-blue-600 text-blue-600 whitespace-nowrap">Overview</button>
+      <button onclick="setModalTab('preview')"  id="mtab-preview"  class="modal-tab text-sm font-medium px-1 py-2.5 mr-5 border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Preview</button>
+      <button onclick="setModalTab('notes')"    id="mtab-notes"    class="modal-tab text-sm font-medium px-1 py-2.5 mr-5 border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">Notes</button>
+      <button onclick="setModalTab('history')"  id="mtab-history"  class="modal-tab text-sm font-medium px-1 py-2.5 border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">History</button>
+    </div>
+
+    <!-- Overview tab -->
+    <div id="modal-tab-overview" class="p-5 space-y-5">
+      <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Financials</p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-0.5">Subtotal</p><p id="m-subtotal" class="font-semibold text-sm text-gray-800"></p></div>
+          <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-0.5">Tax</p><p id="m-tax" class="font-semibold text-sm text-gray-800"></p></div>
+          <div class="bg-blue-50 rounded-lg p-3"><p class="text-xs text-blue-400 mb-0.5">Total</p><p id="m-total" class="font-bold text-sm text-blue-700"></p></div>
+          <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-0.5">Currency</p><p id="m-currency" class="font-semibold text-sm text-gray-800"></p></div>
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Dates &amp; Terms</p>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-0.5">Invoice Date</p><p id="m-inv-date" class="font-semibold text-sm text-gray-800"></p></div>
+          <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-0.5">Due Date</p><p id="m-due-date" class="font-semibold text-sm text-gray-800"></p></div>
+          <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-0.5">Terms</p><p id="m-terms" class="font-semibold text-sm text-gray-800"></p></div>
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Vendor</p>
+        <div class="grid grid-cols-3 gap-2">
+          <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-0.5">Address</p><p id="m-addr" class="font-semibold text-sm text-gray-800 whitespace-pre-line"></p></div>
+          <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-0.5">Email</p><p id="m-email" class="font-semibold text-sm text-gray-800"></p></div>
+          <div class="bg-gray-50 rounded-lg p-3"><p class="text-xs text-gray-400 mb-0.5">Source File</p><p id="m-source" class="font-semibold text-sm text-gray-800 truncate"></p></div>
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Line Items</p>
+        <div class="rounded-lg border overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 border-b"><tr>
+              <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Description</th>
+              <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Qty</th>
+              <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Unit</th>
+              <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Total</th>
+            </tr></thead>
+            <tbody id="m-line-items"></tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">AI Confidence</p>
+        <div class="flex items-center gap-3">
+          <div class="flex-1 bg-gray-200 rounded-full h-2"><div id="m-conf-bar" class="h-2 rounded-full transition-all" style="width:0%"></div></div>
+          <span id="m-conf-pct" class="text-sm font-semibold text-gray-700 w-10 text-right"></span>
+        </div>
+      </div>
+      <div id="m-flags-section" class="hidden">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Anomaly Flags</p>
+        <div id="m-flags" class="flex flex-wrap gap-1.5"></div>
+      </div>
+      <!-- Categories edit -->
+      <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Categories</p>
+        <div class="flex items-center gap-2">
+          <div id="m-cats" class="flex flex-wrap gap-1 flex-1"></div>
+          <input id="cat-input" type="text" placeholder="Add tag…" maxlength="30"
+            class="border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-28"
+            onkeydown="if(event.key==='Enter') addCategory()"/>
+          <button onclick="addCategory()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-lg transition">Add</button>
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Update Status</p>
+        <div id="m-status-actions" class="flex flex-wrap gap-2"></div>
+      </div>
+    </div>
+
+    <!-- Preview tab -->
+    <div id="modal-tab-preview" class="hidden p-5">
+      <div id="preview-container" class="border rounded-xl overflow-hidden" style="min-height:400px">
+        <div class="flex items-center justify-center h-64 text-gray-400 text-sm">
+          <div class="text-center"><div class="text-4xl mb-2">📄</div><p>Loading preview…</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes tab -->
+    <div id="modal-tab-notes" class="hidden p-5 space-y-4">
+      <div class="flex gap-2">
+        <input id="note-input" type="text" placeholder="Add a note…" maxlength="500"
+          class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          onkeydown="if(event.key==='Enter') addNote()"/>
+        <button onclick="addNote()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Add</button>
+      </div>
+      <div id="notes-list" class="space-y-2 min-h-[80px]"><p class="text-gray-400 text-sm text-center py-6">No notes yet.</p></div>
+    </div>
+
+    <!-- History tab -->
+    <div id="modal-tab-history" class="hidden p-5">
+      <div id="audit-list" class="space-y-2 min-h-[80px]"><p class="text-gray-400 text-sm text-center py-6">No history yet.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Command Palette ════════════════════════════════════════════════════════ -->
+<div id="cmd-backdrop" class="hidden fixed inset-0 bg-black/40 z-50 flex items-start justify-center pt-16 px-4" onclick="closeCmdPalette()">
+  <div class="cmd-box w-full max-w-xl shadow-2xl overflow-hidden" onclick="event.stopPropagation()">
+    <div class="flex items-center gap-3 px-4 py-3 border-b">
+      <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+      <input id="cmd-input" type="text" placeholder="Search actions or invoices…" autocomplete="off"
+        class="flex-1 text-sm outline-none bg-transparent text-gray-900 placeholder-gray-400"
+        oninput="renderCmdResults(this.value)"
+        onkeydown="onCmdKey(event)"/>
+      <kbd class="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono text-gray-400">Esc</kbd>
+    </div>
+    <div id="cmd-results" class="max-h-80 overflow-y-auto py-1"></div>
+  </div>
+</div>
+
+<!-- ══ Keyboard Shortcuts Help ═══════════════════════════════════════════════ -->
+<div id="kbd-help" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onclick="this.classList.add('hidden')">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 w-80" onclick="event.stopPropagation()">
+    <h3 class="font-bold text-gray-900 mb-4">Keyboard Shortcuts</h3>
+    <div class="space-y-2 text-sm">
+      <div class="flex justify-between"><span class="text-gray-600">Command palette</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">⌘K</kbd></div>
+      <div class="flex justify-between"><span class="text-gray-600">Focus search</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">/</kbd></div>
+      <div class="flex justify-between"><span class="text-gray-600">Close modal</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">Esc</kbd></div>
+      <div class="flex justify-between"><span class="text-gray-600">Show shortcuts</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">?</kbd></div>
+      <div class="border-t pt-2 mt-2 font-medium text-gray-400 text-xs uppercase tracking-wide">Views</div>
+      <div class="flex justify-between"><span class="text-gray-600">Dashboard</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">1</kbd></div>
+      <div class="flex justify-between"><span class="text-gray-600">Calendar</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">2</kbd></div>
+      <div class="flex justify-between"><span class="text-gray-600">Kanban</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">3</kbd></div>
+      <div class="flex justify-between"><span class="text-gray-600">Analytics</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">4</kbd></div>
+      <div class="flex justify-between"><span class="text-gray-600">Vendors</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">5</kbd></div>
+      <div class="flex justify-between"><span class="text-gray-600">Aging Report</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">6</kbd></div>
+      <div class="flex justify-between"><span class="text-gray-600">Settings</span><kbd class="bg-gray-100 px-2 py-0.5 rounded text-xs font-mono">7</kbd></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Calendar day popover ════════════════════════════════════════════════════ -->
+<div id="cal-popover" class="hidden fixed z-40 bg-white border rounded-xl shadow-2xl p-4 w-72"></div>
+
+<script>
+// ══ State ════════════════════════════════════════════════════════════════════
+const S = {
+  invoices: [], filter: 'all', search: '',
+  advFilters: { dateFrom:'', dateTo:'', amtMin:'', amtMax:'', category:'', flags:'' },
+  sort: { col: null, dir: 'asc' },
+  selected: new Set(),
+  view: 'dashboard', dark: false,
+  modalInvNum: null, modalTab: 'overview',
+  analytics: null, vendors: [], allVendors: [],
+  budgets: [], webhooks: [], savedFilters: [],
+  charts: {},
+  calMonth: new Date(),
+  yoy: null, forecast: null, aging: null,
+  _cmdIdx: -1,
+};
+
+// ══ Init ═════════════════════════════════════════════════════════════════════
+(function init() {
+  S.dark = localStorage.getItem('dark') === '1';
+  applyDark();
+  S.calMonth = new Date();
+  S.calMonth.setDate(1);
+  loadAll();
+  loadSavedFilters();
+  connectSSE();
+  document.addEventListener('keydown', onKey);
+  document.addEventListener('click', hideCalPopover);
+})();
+
+// ══ SSE ══════════════════════════════════════════════════════════════════════
+let _sse = null;
+function connectSSE() {
+  if (_sse) return;
+  _sse = new EventSource('/api/events');
+  _sse.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    if (['invoice_added','invoice_updated','invoice_deleted','batch_complete'].includes(msg.type)) loadAll();
+  };
+  _sse.onerror = () => { _sse?.close(); _sse = null; setTimeout(connectSSE, 5000); };
+}
+
+// ══ Data loading ══════════════════════════════════════════════════════════════
+async function loadAll() {
+  try {
+    const [statsRes, invRes, statusRes] = await Promise.all([
+      fetch('/api/stats'), fetch('/api/invoices'), fetch('/api/status'),
+    ]);
+    if (!statsRes.ok || !invRes.ok) throw new Error();
+    const stats  = await statsRes.json();
+    const invs   = await invRes.json();
+    const status = await statusRes.json();
+    S.invoices = invs;
+    renderStats(stats);
+    renderStatus(status);
+    renderInvoices();
+    if (S.view === 'analytics') loadAnalytics();
+    if (S.view === 'vendors')   loadVendors();
+    if (S.view === 'calendar')  renderCalendar();
+    if (S.view === 'kanban')    renderKanban();
+    if (S.view === 'aging')     loadAging();
+    setStatusDot(true);
+  } catch { setStatusDot(false); }
+}
+
+async function loadAnalytics() {
+  try {
+    const [aRes, yoyRes, fcRes, bRes] = await Promise.all([
+      fetch('/api/analytics'), fetch('/api/analytics/yoy'),
+      fetch('/api/analytics/forecast'), fetch('/api/budgets'),
+    ]);
+    S.analytics = await aRes.json();
+    S.yoy = await yoyRes.json();
+    S.forecast = await fcRes.json();
+    S.budgets = await bRes.json();
+    renderAnalytics();
+    renderBudgetAnalytics();
+  } catch {}
+}
+
+async function loadVendors() {
+  try {
+    const res = await fetch('/api/vendors');
+    S.allVendors = S.vendors = await res.json();
+    setText('vendor-count', S.vendors.length);
+    renderVendors();
+  } catch {}
+}
+
+async function loadAging() {
+  try {
+    const res = await fetch('/api/analytics/aging');
+    S.aging = await res.json();
+    renderAging();
+  } catch {}
+}
+
+async function loadSavedFilters() {
+  try {
+    const res = await fetch('/api/filters');
+    S.savedFilters = await res.json();
+    renderSavedFilterStrip();
+  } catch {}
+}
+
+// ══ Views ═════════════════════════════════════════════════════════════════════
+const ALL_VIEWS = ['dashboard','calendar','kanban','analytics','vendors','aging','settings'];
+function setView(v) {
+  S.view = v;
+  ALL_VIEWS.forEach(name => {
+    document.getElementById('view-' + name)?.classList.toggle('hidden', name !== v);
+    const btn = document.getElementById('nav-' + name);
+    if (btn) {
+      btn.classList.toggle('bg-gray-100', name === v);
+      btn.classList.toggle('text-gray-900', name === v);
+    }
+  });
+  if (v === 'analytics') loadAnalytics();
+  if (v === 'vendors')   loadVendors();
+  if (v === 'calendar')  renderCalendar();
+  if (v === 'kanban')    renderKanban();
+  if (v === 'aging')     loadAging();
+  if (v === 'settings')  loadSettings();
+}
+
+// ══ Render: stats ═════════════════════════════════════════════════════════════
+function renderStats(s) {
+  setText('stat-total',   s.total_invoices ?? 0);
+  setText('stat-amount',  '$' + fmt$(s.total_amount ?? 0));
+  setText('stat-pending', s.pending ?? 0);
+  setText('stat-flagged', s.flagged ?? 0);
+  setText('stat-overdue', s.overdue ?? 0);
+  setText('stat-review',  s.under_review ?? 0);
+  setText('stat-paid',    s.paid ?? 0);
+  if (s.last_run) setText('last-run-text', 'Last run: ' + new Date(s.last_run).toLocaleString());
+}
+
+function renderStatus(s) {
+  const badge = document.getElementById('processing-badge');
+  const btn   = document.getElementById('btn-process');
+  badge?.classList.toggle('hidden', !s.running);
+  if (btn) { btn.disabled = s.running; btn.classList.toggle('opacity-50', s.running); }
+  if (s.error) showToast('Processing error: ' + s.error, 6000);
+}
+
+// ══ Render: invoice table ════════════════════════════════════════════════════
+function getVisible() {
+  let list = S.filter === 'all' ? S.invoices : S.invoices.filter(i => i.status === S.filter);
+  const q = S.search.toLowerCase();
+  if (q) list = list.filter(i =>
+    (i.vendor_name||'').toLowerCase().includes(q) ||
+    (i.invoice_number||'').toLowerCase().includes(q) ||
+    (i.categories||[]).some(c => c.toLowerCase().includes(q))
+  );
+  // Advanced filters
+  const af = S.advFilters;
+  if (af.dateFrom) list = list.filter(i => i.invoice_date && i.invoice_date >= af.dateFrom);
+  if (af.dateTo)   list = list.filter(i => i.invoice_date && i.invoice_date <= af.dateTo);
+  if (af.amtMin)   list = list.filter(i => i.total_amount >= parseFloat(af.amtMin));
+  if (af.amtMax)   list = list.filter(i => i.total_amount <= parseFloat(af.amtMax));
+  if (af.category) list = list.filter(i => (i.categories||[]).some(c => c.toLowerCase().includes(af.category.toLowerCase())));
+  if (af.flags === 'has')    list = list.filter(i => (i.flags||[]).length > 0);
+  if (af.flags === 'none')   list = list.filter(i => (i.flags||[]).length === 0);
+  if (af.flags && af.flags !== 'has' && af.flags !== 'none')
+    list = list.filter(i => (i.flags||[]).some(f => f.startsWith(af.flags)));
+  // Sort
+  if (S.sort.col) {
+    const asc = S.sort.dir === 'asc';
+    list = [...list].sort((a, b) => {
+      let va = a[S.sort.col], vb = b[S.sort.col];
+      if (va == null && vb == null) return 0;
+      if (va == null) return asc ? 1 : -1;
+      if (vb == null) return asc ? -1 : 1;
+      if (typeof va === 'string') return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+      return asc ? va - vb : vb - va;
+    });
+  }
+  return list;
+}
+
+function renderInvoices() {
+  const list  = getVisible();
+  const tbody = document.getElementById('invoice-tbody');
+  if (!list.length) {
+    if (S.invoices.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="11" class="p-0"><div id="empty-state" class="px-4 py-14 text-center"><div class="max-w-xs mx-auto"><div class="text-5xl mb-3">📄</div><p class="text-gray-600 font-medium mb-1">No invoices yet</p><p class="text-gray-400 text-sm mb-4">Upload a PDF or run a Gmail processing cycle to get started.</p><div class="flex justify-center gap-2"><label class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">Upload Invoice<input type="file" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" onchange="uploadFile(this.files[0])"></label><button onclick="triggerProcessing()" class="bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg border transition">Run Cycle</button></div></div></div></td></tr>`;
+    } else {
+      const msg = S.search ? `No results for "${esc(S.search)}"` : `No ${S.filter === 'all' ? '' : S.filter + ' '}invoices.`;
+      tbody.innerHTML = `<tr><td colspan="11" class="px-4 py-12 text-center text-gray-400 text-sm">${msg}</td></tr>`;
+    }
+    return;
+  }
+  tbody.innerHTML = list.map(inv => {
+    const conf  = inv.confidence_score ? Math.round(inv.confidence_score * 100) + '%' : '—';
+    const flags = (inv.flags||[]).slice(0,2).map(f =>
+      `<span class="inline-block bg-red-100 text-red-700 text-xs px-1.5 py-0.5 rounded">${esc(f.split(':')[0])}</span>`
+    ).join(' ');
+    const cats = (inv.categories||[]).slice(0,2).map(c =>
+      `<span class="tag-chip">${esc(c)}</span>`
+    ).join(' ');
+    const sel = S.selected.has(inv.invoice_number);
+    const qa  = quickActions(inv);
+    return `<tr class="border-b last:border-0 hover:bg-gray-50 transition cursor-pointer ${sel ? 'bg-blue-50' : ''}" onclick="openModal('${esc(inv.invoice_number)}')">
+      <td class="px-3 py-3" onclick="event.stopPropagation()">
+        <input type="checkbox" ${sel ? 'checked' : ''} onchange="toggleSelect('${esc(inv.invoice_number)}',this.checked)" class="rounded"/>
+      </td>
+      <td class="px-3 py-3 font-medium text-gray-900 max-w-[140px] truncate">${esc(inv.vendor_name||'—')}</td>
+      <td class="px-3 py-3 text-gray-600 font-mono text-xs">${esc(inv.invoice_number||'—')}</td>
+      <td class="px-3 py-3 text-right font-semibold text-gray-900">${inv.currency||'USD'} ${fmt$(inv.total_amount)}</td>
+      <td class="px-3 py-3 text-gray-500 text-xs">${fmtDate(inv.invoice_date)}</td>
+      <td class="px-3 py-3 text-gray-500 text-xs">${fmtDate(inv.due_date)}</td>
+      <td class="px-3 py-3 hide-sm">
+        <div class="flex items-center gap-1"><div class="w-12 bg-gray-200 rounded-full h-1.5"><div class="h-1.5 rounded-full ${confColor(inv.confidence_score)}" style="width:${Math.round((inv.confidence_score||0)*100)}%"></div></div><span class="text-xs text-gray-500">${conf}</span></div>
+      </td>
+      <td class="px-3 py-3">
+        <div class="flex items-center gap-1 flex-wrap">
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium pill-${inv.status}">${statusLabel(inv.status)}</span>
+          ${qa}
+        </div>
+      </td>
+      <td class="px-3 py-3 max-w-[120px] hide-sm">${cats || '<span class="text-gray-300 text-xs">—</span>'}</td>
+      <td class="px-3 py-3 max-w-[120px] hide-sm">${flags || '<span class="text-green-600 text-xs">✓</span>'}</td>
+      <td class="px-3 py-3" onclick="event.stopPropagation()">
+        <button onclick="deleteInvoice('${esc(inv.invoice_number)}')" class="text-gray-300 hover:text-red-500 transition" title="Delete">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function quickActions(inv) {
+  const btns = [];
+  if (inv.status === 'pending' || inv.status === 'flagged')
+    btns.push(`<button onclick="event.stopPropagation();updateStatus('${esc(inv.invoice_number)}','under_review')" class="text-xs px-1.5 py-0.5 rounded bg-purple-100 text-purple-700 hover:bg-purple-200 transition">Review</button>`);
+  if (inv.status === 'pending' || inv.status === 'under_review' || inv.status === 'flagged')
+    btns.push(`<button onclick="event.stopPropagation();updateStatus('${esc(inv.invoice_number)}','approved')" class="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 hover:bg-green-200 transition">✓</button>`);
+  if (inv.status === 'approved')
+    btns.push(`<button onclick="event.stopPropagation();updateStatus('${esc(inv.invoice_number)}','paid')" class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 hover:bg-blue-200 transition">$</button>`);
+  return btns.join('');
+}
+
+function statusLabel(s) {
+  const map = { under_review: 'Review' };
+  return map[s] || s;
+}
+
+// ══ Render: Analytics ════════════════════════════════════════════════════════
+function renderAnalytics() {
+  const a = S.analytics;
+  if (!a) return;
+  const isDark = S.dark;
+  const gridColor = isDark ? '#334155' : '#e2e8f0';
+  const textColor = isDark ? '#94a3b8' : '#6b7280';
+  const defaults = { responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: textColor, boxWidth: 12, font: { size: 11 } } } } };
+
+  setText('an-total',   '$' + fmt$(a.summary.total_amount));
+  setText('an-avg',     '$' + fmt$(a.summary.avg_amount));
+  setText('an-vendors', a.summary.vendor_count);
+  setText('an-conf',    Math.round(a.summary.avg_confidence * 100) + '%');
+
+  const PALETTE = ['#3b82f6','#8b5cf6','#ec4899','#f59e0b','#10b981','#06b6d4','#ef4444','#84cc16','#6366f1'];
+
+  destroyChart('monthly');
+  S.charts.monthly = new Chart(el('chart-monthly').getContext('2d'), { type:'bar',
+    data: { labels: a.monthly_spend.map(m => m.month), datasets: [{ label:'Spend ($)', data: a.monthly_spend.map(m => m.amount), backgroundColor:'#3b82f6', borderRadius:4, borderSkipped:false }] },
+    options: { ...defaults, scales: { x:{ grid:{color:gridColor}, ticks:{color:textColor} }, y:{ grid:{color:gridColor}, ticks:{color:textColor, callback: v => '$'+(v>=1000?(v/1000).toFixed(0)+'k':v)} } } }
+  });
+
+  destroyChart('vendor');
+  S.charts.vendor = new Chart(el('chart-vendor').getContext('2d'), { type:'doughnut',
+    data: { labels: a.vendor_breakdown.map(v => v.vendor), datasets: [{ data: a.vendor_breakdown.map(v => v.amount), backgroundColor: PALETTE, borderWidth:2, borderColor: isDark?'#1e293b':'#fff' }] },
+    options: { ...defaults, cutout:'60%' }
+  });
+
+  destroyChart('status');
+  const statusColors = { pending:'#fbbf24', under_review:'#a855f7', flagged:'#ef4444', approved:'#22c55e', paid:'#3b82f6', overdue:'#ec4899' };
+  const sLabels = Object.keys(a.status_dist);
+  S.charts.status = new Chart(el('chart-status').getContext('2d'), { type:'doughnut',
+    data: { labels: sLabels, datasets: [{ data: sLabels.map(k => a.status_dist[k]), backgroundColor: sLabels.map(k => statusColors[k]||'#94a3b8'), borderWidth:2, borderColor: isDark?'#1e293b':'#fff' }] },
+    options: { ...defaults, cutout:'60%' }
+  });
+
+  destroyChart('conf');
+  const cLabels = Object.keys(a.conf_buckets);
+  S.charts.conf = new Chart(el('chart-conf').getContext('2d'), { type:'bar',
+    data: { labels: cLabels, datasets: [{ label:'Invoices', data: cLabels.map(k => a.conf_buckets[k]), backgroundColor:['#ef4444','#f59e0b','#22c55e','#3b82f6'], borderRadius:4 }] },
+    options: { ...defaults, scales: { x:{grid:{color:gridColor},ticks:{color:textColor}}, y:{grid:{color:gridColor},ticks:{color:textColor},beginAtZero:true} }, plugins:{...defaults.plugins,legend:{display:false}} }
+  });
+
+  // YoY
+  if (S.yoy) {
+    destroyChart('yoy');
+    S.charts.yoy = new Chart(el('chart-yoy').getContext('2d'), { type:'line',
+      data: { labels: S.yoy.labels, datasets: [
+        { label: String(S.yoy.current_year), data: S.yoy.current, borderColor:'#3b82f6', backgroundColor:'#3b82f620', fill:true, tension:0.3, pointRadius:3 },
+        { label: String(S.yoy.prior_year),   data: S.yoy.prior,   borderColor:'#94a3b8', backgroundColor:'transparent', borderDash:[4,4], tension:0.3, pointRadius:3 },
+      ]},
+      options: { ...defaults, scales: { x:{grid:{color:gridColor},ticks:{color:textColor}}, y:{grid:{color:gridColor},ticks:{color:textColor,callback:v=>'$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}} } }
+    });
+  }
+
+  // Forecast
+  if (S.forecast && S.forecast.historical_months?.length > 0) {
+    destroyChart('forecast');
+    const trendBadge = el('forecast-trend');
+    if (trendBadge) {
+      const t = S.forecast.trend;
+      trendBadge.textContent = t === 'up' ? '↑ Trending up' : t === 'down' ? '↓ Trending down' : '→ Flat';
+      trendBadge.className = `text-xs font-medium px-2 py-0.5 rounded-full ${t==='up'?'bg-red-100 text-red-700':t==='down'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-500'}`;
+    }
+    const allMonths = [...S.forecast.historical_months, ...S.forecast.forecast_months];
+    const histLen = S.forecast.historical_months.length;
+    const histData = [...S.forecast.historical_values, ...Array(3).fill(null)];
+    const fcData   = [...Array(histLen - 1).fill(null), S.forecast.historical_values[histLen-1], ...S.forecast.forecast_values];
+    S.charts.forecast = new Chart(el('chart-forecast').getContext('2d'), { type:'line',
+      data: { labels: allMonths, datasets: [
+        { label:'Actual', data: histData, borderColor:'#3b82f6', backgroundColor:'#3b82f620', fill:true, tension:0.3, spanGaps:false },
+        { label:'Forecast', data: fcData, borderColor:'#f59e0b', borderDash:[5,5], backgroundColor:'#f59e0b10', fill:false, tension:0.3, spanGaps:false },
+      ]},
+      options: { ...defaults, scales: { x:{grid:{color:gridColor},ticks:{color:textColor}}, y:{grid:{color:gridColor},ticks:{color:textColor,callback:v=>'$'+(v>=1000?(v/1000).toFixed(0)+'k':v)}} } }
+    });
+  }
+}
+
+function renderBudgetAnalytics() {
+  const el2 = document.getElementById('budget-list-analytics');
+  if (!S.budgets?.length) {
+    el2.innerHTML = `<p class="text-sm text-gray-400 text-center py-4">No budgets configured. <button onclick="setView('settings')" class="text-blue-600 hover:underline">Add one →</button></p>`;
+    return;
+  }
+  el2.innerHTML = S.budgets.map(b => {
+    const pct = Math.min(b.utilization * 100, 100);
+    const color = b.utilization >= 1 ? 'bg-red-500' : b.utilization >= 0.8 ? 'bg-yellow-400' : 'bg-green-500';
+    const textColor2 = b.utilization >= 1 ? 'text-red-700' : b.utilization >= 0.8 ? 'text-yellow-700' : 'text-gray-700';
+    return `<div>
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-sm font-medium text-gray-700">${esc(b.name)}</span>
+        <span class="text-sm ${textColor2} font-semibold">$${fmt$(b.current_spend)} / $${fmt$(b.monthly_limit)}</span>
+      </div>
+      <div class="bg-gray-200 rounded-full h-2">
+        <div class="budget-bar h-2 rounded-full ${color}" style="width:${pct}%"></div>
+      </div>
+      <p class="text-xs text-gray-400 mt-0.5">${b.scope} · ${Math.round(b.utilization * 100)}% used this month</p>
+    </div>`;
+  }).join('');
+}
+
+function destroyChart(key) {
+  if (S.charts[key]) { S.charts[key].destroy(); delete S.charts[key]; }
+}
+
+// ══ Render: Vendors ═══════════════════════════════════════════════════════════
+function renderVendors() {
+  const grid = document.getElementById('vendor-grid');
+  if (!S.vendors?.length) {
+    grid.innerHTML = '<p class="text-gray-400 text-sm col-span-full py-12 text-center">No vendor data yet.</p>';
+    return;
+  }
+  const statusColors = { pending:'bg-yellow-100 text-yellow-800', under_review:'bg-purple-100 text-purple-800',
+    flagged:'bg-red-100 text-red-800', approved:'bg-green-100 text-green-800', paid:'bg-blue-100 text-blue-800', overdue:'bg-pink-100 text-pink-800' };
+  grid.innerHTML = S.vendors.map(v => {
+    const statuses = Object.entries(v.statuses || {}).map(([s, n]) =>
+      `<span class="text-xs px-1.5 py-0.5 rounded font-medium ${statusColors[s]||''}">${n} ${statusLabel(s)}</span>`
+    ).join('');
+    const cats = (v.categories||[]).slice(0,3).map(c => `<span class="tag-chip">${esc(c)}</span>`).join('');
+    const conf = Math.round((v.avg_confidence || 0) * 100);
+    return `<div class="vendor-card bg-white rounded-xl border shadow-sm p-4 cursor-pointer" onclick="filterByVendor('${esc(v.vendor_name)}')">
+      <div class="flex items-start justify-between mb-2">
+        <div class="min-w-0"><h3 class="font-semibold text-gray-900 text-sm truncate">${esc(v.vendor_name)}</h3><p class="text-xs text-gray-400 mt-0.5">${v.count} invoice${v.count!==1?'s':''} · ${v.latest_invoice||'—'}</p></div>
+        <p class="text-lg font-bold text-gray-900 ml-2">$${fmt$(v.total_amount)}</p>
+      </div>
+      ${cats ? `<div class="flex flex-wrap gap-1 mb-2">${cats}</div>` : ''}
+      <div class="flex flex-wrap gap-1 mb-2">${statuses}</div>
+      <div class="flex items-center gap-2">
+        <div class="flex-1 bg-gray-200 rounded-full h-1.5"><div class="h-1.5 rounded-full ${confColor(v.avg_confidence)}" style="width:${conf}%"></div></div>
+        <span class="text-xs text-gray-400">${conf}% conf.</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterVendors(q) {
+  S.vendors = q ? S.allVendors.filter(v => v.vendor_name.toLowerCase().includes(q.toLowerCase())) : S.allVendors;
+  setText('vendor-count', S.vendors.length);
+  renderVendors();
+}
+
+function filterByVendor(name) {
+  setView('dashboard');
+  S.search = name;
+  document.getElementById('search-input').value = name;
+  renderInvoices();
+}
+
+// ══ Render: Calendar ══════════════════════════════════════════════════════════
+function renderCalendar() {
+  const m = S.calMonth;
+  const yr = m.getFullYear(), mo = m.getMonth();
+  setText('cal-month-label', m.toLocaleDateString('en-US', { month:'long', year:'numeric' }));
+
+  // Build due-date map
+  const dueMap = {};
+  S.invoices.forEach(inv => {
+    if (!inv.due_date) return;
+    const d = new Date(inv.due_date + 'T00:00:00');
+    if (d.getFullYear() === yr && d.getMonth() === mo) {
+      const key = d.getDate();
+      dueMap[key] = dueMap[key] || [];
+      dueMap[key].push(inv);
+    }
+  });
+
+  const first = new Date(yr, mo, 1).getDay();
+  const days  = new Date(yr, mo + 1, 0).getDate();
+  const today = new Date();
+  const todayKey = today.getFullYear() === yr && today.getMonth() === mo ? today.getDate() : -1;
+
+  let html = '';
+  // Pad before
+  for (let i = 0; i < first; i++) html += `<div class="cal-day cal-other p-2 border-b border-r"></div>`;
+
+  for (let d = 1; d <= days; d++) {
+    const invs = dueMap[d] || [];
+    const dots = invs.slice(0,4).map(inv => {
+      const c = inv.status === 'overdue' ? 'bg-red-400' : inv.status === 'paid' ? 'bg-blue-400' : inv.status === 'approved' ? 'bg-green-400' : 'bg-yellow-400';
+      return `<div class="w-2 h-2 rounded-full ${c} flex-shrink-0" title="${esc(inv.vendor_name)} #${esc(inv.invoice_number)}"></div>`;
+    }).join('');
+    const extra = invs.length > 4 ? `<span class="text-xs text-gray-400">+${invs.length - 4}</span>` : '';
+    const todayClass = d === todayKey ? 'cal-today' : '';
+    html += `<div class="cal-day ${todayClass} p-2 border-b border-r" onclick="showCalPopover(event, ${d}, ${JSON.stringify(invs.map(i=>i.invoice_number)).replace(/"/g,'&quot;')})">
+      <p class="text-xs font-semibold ${d===todayKey?'text-blue-600':'text-gray-600'} mb-1.5">${d}</p>
+      <div class="flex flex-wrap gap-0.5">${dots}${extra}</div>
+    </div>`;
+  }
+
+  // Pad after
+  const remaining = (7 - (first + days) % 7) % 7;
+  for (let i = 0; i < remaining; i++) html += `<div class="cal-day cal-other p-2 border-b border-r"></div>`;
+
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function calNav(dir) {
+  S.calMonth.setMonth(S.calMonth.getMonth() + dir);
+  renderCalendar();
+}
+function calToday() {
+  S.calMonth = new Date(); S.calMonth.setDate(1);
+  renderCalendar();
+}
+
+function showCalPopover(event, day, invNums) {
+  event.stopPropagation();
+  const invs = (Array.isArray(invNums) ? invNums : JSON.parse(invNums.replace(/&quot;/g, '"')))
+    .map(n => S.invoices.find(i => i.invoice_number === n)).filter(Boolean);
+  if (!invs.length) return;
+  const pop = document.getElementById('cal-popover');
+  pop.innerHTML = `<p class="text-xs font-semibold text-gray-400 uppercase mb-2">${invs.length} invoice${invs.length!==1?'s':''} due</p>` +
+    invs.map(inv => `<div onclick="openModal('${esc(inv.invoice_number)}')" class="flex items-center justify-between py-1.5 hover:bg-gray-50 rounded px-1 cursor-pointer">
+      <div><p class="text-sm font-medium text-gray-800">${esc(inv.vendor_name)}</p><p class="text-xs text-gray-400 font-mono">#${esc(inv.invoice_number)}</p></div>
+      <div class="text-right"><p class="text-sm font-semibold text-gray-900">$${fmt$(inv.total_amount)}</p><span class="text-xs px-1.5 py-0.5 rounded-full font-medium pill-${inv.status}">${statusLabel(inv.status)}</span></div>
+    </div>`).join('');
+  const rect = event.currentTarget.getBoundingClientRect();
+  pop.style.left = Math.min(rect.left + window.scrollX, window.innerWidth - 290) + 'px';
+  pop.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+  pop.classList.remove('hidden');
+}
+
+function hideCalPopover(e) {
+  const pop = document.getElementById('cal-popover');
+  if (!pop.contains(e.target) && !e.target.closest('.cal-day')) pop.classList.add('hidden');
+}
+
+// ══ Render: Kanban ═══════════════════════════════════════════════════════════
+const KANBAN_STATUSES = [
+  { id:'pending',      label:'Pending',      color:'text-yellow-600', bg:'bg-yellow-100' },
+  { id:'under_review', label:'Under Review', color:'text-purple-600', bg:'bg-purple-100' },
+  { id:'flagged',      label:'Flagged',      color:'text-red-600',    bg:'bg-red-100'    },
+  { id:'approved',     label:'Approved',     color:'text-green-600',  bg:'bg-green-100'  },
+  { id:'paid',         label:'Paid',         color:'text-blue-600',   bg:'bg-blue-100'   },
+  { id:'overdue',      label:'Overdue',      color:'text-pink-600',   bg:'bg-pink-100'   },
+];
+
+function renderKanban() {
+  KANBAN_STATUSES.forEach(col => {
+    const invs = S.invoices.filter(i => i.status === col.id);
+    const colEl = document.getElementById('kcol-' + col.id);
+    colEl.innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-sm font-semibold text-gray-700">${col.label}</span>
+        <span class="text-xs ${col.bg} ${col.color} px-2 py-0.5 rounded-full font-medium">${invs.length}</span>
+      </div>
+      <div class="space-y-2 min-h-[200px]">
+        ${invs.map(inv => `
+          <div class="kanban-card bg-white rounded-lg border p-3 text-sm select-none"
+               draggable="true"
+               ondragstart="onKanbanStart(event,'${esc(inv.invoice_number)}')"
+               ondragend="onKanbanEnd(event)"
+               onclick="openModal('${esc(inv.invoice_number)}')">
+            <p class="font-medium text-gray-800 truncate">${esc(inv.vendor_name)}</p>
+            <p class="text-xs text-gray-400 font-mono mt-0.5">#${esc(inv.invoice_number)}</p>
+            <p class="text-sm font-bold text-gray-900 mt-1.5">${inv.currency||'USD'} ${fmt$(inv.total_amount)}</p>
+            ${inv.due_date ? `<p class="text-xs text-gray-400 mt-1">Due ${fmtDate(inv.due_date)}</p>` : ''}
+            ${(inv.flags||[]).length ? `<p class="text-xs text-red-500 mt-1">${inv.flags.length} flag${inv.flags.length>1?'s':''}</p>` : ''}
+          </div>`).join('')}
+      </div>`;
+  });
+}
+
+let _draggingNum = null;
+function onKanbanStart(e, invNum) {
+  _draggingNum = invNum;
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onKanbanEnd(e) {
+  _draggingNum = null;
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.kanban-over').forEach(el2 => el2.classList.remove('kanban-over'));
+}
+function onKanbanOver(e, status) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  document.getElementById('kcol-' + status)?.classList.add('kanban-over');
+}
+function onKanbanLeave(e) {
+  e.currentTarget.classList.remove('kanban-over');
+}
+async function onKanbanDrop(e, status) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('kanban-over');
+  if (!_draggingNum) return;
+  const inv = S.invoices.find(i => i.invoice_number === _draggingNum);
+  if (!inv || inv.status === status) return;
+  await updateStatus(_draggingNum, status);
+  renderKanban();
+}
+
+// ══ Render: Aging ═════════════════════════════════════════════════════════════
+const AGING_BUCKETS = [
+  { key:'current', label:'Current',    color:'text-green-700', bg:'bg-green-50',  border:'border-green-200' },
+  { key:'1-30',    label:'1–30 Days',  color:'text-yellow-700',bg:'bg-yellow-50', border:'border-yellow-200' },
+  { key:'31-60',   label:'31–60 Days', color:'text-orange-700',bg:'bg-orange-50', border:'border-orange-200' },
+  { key:'61-90',   label:'61–90 Days', color:'text-red-700',   bg:'bg-red-50',    border:'border-red-200' },
+  { key:'90+',     label:'90+ Days',   color:'text-red-900',   bg:'bg-red-100',   border:'border-red-300' },
+];
+
+function renderAging() {
+  if (!S.aging) return;
+  const summary = document.getElementById('aging-summary');
+  summary.innerHTML = AGING_BUCKETS.map(b => {
+    const d = S.aging[b.key] || { count:0, total:0 };
+    return `<div class="aging-card ${b.bg} border ${b.border} rounded-xl p-4">
+      <p class="text-xs font-semibold ${b.color} uppercase mb-1">${b.label}</p>
+      <p class="text-2xl font-bold ${b.color}">${d.count}</p>
+      <p class="text-sm ${b.color} font-medium mt-0.5">$${fmt$(d.total)}</p>
+    </div>`;
+  }).join('');
+
+  const tables = document.getElementById('aging-tables');
+  tables.innerHTML = AGING_BUCKETS.filter(b => (S.aging[b.key]?.count || 0) > 0).map(b => {
+    const d = S.aging[b.key];
+    const rows = d.invoices.map(inv => `<tr class="border-b last:border-0 hover:bg-gray-50 cursor-pointer" onclick="openModal('${esc(inv.invoice_number)}')">
+      <td class="px-3 py-2.5 font-medium text-gray-800 text-sm">${esc(inv.vendor_name)}</td>
+      <td class="px-3 py-2.5 text-gray-500 text-xs font-mono">${esc(inv.invoice_number)}</td>
+      <td class="px-3 py-2.5 text-right font-semibold text-gray-900 text-sm">${inv.currency||'USD'} ${fmt$(inv.total_amount)}</td>
+      <td class="px-3 py-2.5 text-gray-500 text-xs">${fmtDate(inv.due_date)}</td>
+      <td class="px-3 py-2.5"><span class="text-xs px-2 py-0.5 rounded-full font-medium pill-${inv.status}">${statusLabel(inv.status)}</span></td>
+    </tr>`).join('');
+    return `<div class="bg-white rounded-xl border shadow-sm overflow-hidden">
+      <div class="${b.bg} px-4 py-3 border-b flex items-center justify-between">
+        <h3 class="text-sm font-bold ${b.color}">${b.label}</h3>
+        <span class="text-sm ${b.color} font-medium">${d.count} invoice${d.count!==1?'s':''} · $${fmt$(d.total)}</span>
+      </div>
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b"><tr>
+          <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Vendor</th>
+          <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Invoice #</th>
+          <th class="text-right px-3 py-2 text-xs font-semibold text-gray-500">Amount</th>
+          <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Due Date</th>
+          <th class="text-left px-3 py-2 text-xs font-semibold text-gray-500">Status</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+}
+
+// ══ Render: Settings ══════════════════════════════════════════════════════════
+async function loadSettings() {
+  try {
+    const [bRes, wRes] = await Promise.all([fetch('/api/budgets'), fetch('/api/webhooks')]);
+    S.budgets = await bRes.json();
+    S.webhooks = await wRes.json();
+    renderBudgetTable();
+    renderWebhookTable();
+    populateScopeOptions();
+  } catch {}
+}
+
+function populateScopeOptions() {
+  const vg = document.getElementById('b-scope-vendors');
+  const cg = document.getElementById('b-scope-categories');
+  if (!vg || !cg) return;
+  const vendors = [...new Set(S.invoices.map(i => i.vendor_name))].sort();
+  const cats = [...new Set(S.invoices.flatMap(i => i.categories||[]))].sort();
+  vg.innerHTML = vendors.map(v => `<option value="vendor:${esc(v)}">${esc(v)}</option>`).join('');
+  cg.innerHTML = cats.map(c => `<option value="category:${esc(c)}">${esc(c)}</option>`).join('');
+}
+
+function renderBudgetTable() {
+  const t = document.getElementById('budget-table');
+  if (!S.budgets.length) { t.innerHTML = '<p class="text-sm text-gray-400 text-center py-6">No budgets yet.</p>'; return; }
+  t.innerHTML = S.budgets.map(b => {
+    const pct = Math.min(Math.round((b.utilization||0)*100), 100);
+    const barColor = (b.utilization||0)>=1 ? 'bg-red-500' : (b.utilization||0)>=0.8 ? 'bg-yellow-400' : 'bg-green-500';
+    return `<div class="flex items-center gap-4 p-3 rounded-xl border">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <p class="text-sm font-medium text-gray-800">${esc(b.name)}</p>
+          <span class="text-xs text-gray-400">${esc(b.scope)}</span>
+        </div>
+        <div class="flex items-center gap-2 mt-1">
+          <div class="flex-1 bg-gray-200 rounded-full h-1.5"><div class="budget-bar h-1.5 rounded-full ${barColor}" style="width:${pct}%"></div></div>
+          <span class="text-xs text-gray-500">$${fmt$(b.current_spend||0)} / $${fmt$(b.monthly_limit)}</span>
+        </div>
+      </div>
+      <button onclick="deleteBudget(${b.id})" class="text-gray-300 hover:text-red-500 transition flex-shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function renderWebhookTable() {
+  const t = document.getElementById('webhook-table');
+  if (!S.webhooks.length) { t.innerHTML = '<p class="text-sm text-gray-400 text-center py-6">No webhooks yet.</p>'; return; }
+  t.innerHTML = S.webhooks.map(w => {
+    const events = typeof w.events === 'string' ? JSON.parse(w.events) : (w.events || ['all']);
+    return `<div class="flex items-center gap-3 p-3 rounded-xl border">
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-gray-800">${esc(w.name)}</p>
+        <p class="text-xs text-gray-400 truncate">${esc(w.url)}</p>
+        <div class="flex gap-1 mt-1">${events.map(e=>`<span class="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">${e}</span>`).join('')}</div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <label class="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" ${w.enabled ? 'checked' : ''} onchange="toggleWebhook(${w.id},this.checked)" class="sr-only peer">
+          <div class="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:bg-blue-600 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition"></div>
+        </label>
+        <button onclick="deleteWebhook(${w.id})" class="text-gray-300 hover:text-red-500 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ══ Modal ═════════════════════════════════════════════════════════════════════
+async function openModal(invNum) {
+  const inv = S.invoices.find(i => i.invoice_number === invNum);
+  if (!inv) return;
+  S.modalInvNum = invNum;
+
+  setText('modal-inv-num', inv.invoice_number || 'UNKNOWN');
+  setText('modal-vendor',  inv.vendor_name || '—');
+
+  const badge = document.getElementById('modal-status-badge');
+  badge.textContent = statusLabel(inv.status);
+  badge.className = `text-xs px-2 py-0.5 rounded-full font-medium pill-${inv.status}`;
+
+  // Tags in header
+  const tagsEl = document.getElementById('modal-tags');
+  tagsEl.innerHTML = (inv.categories||[]).map(c => `<span class="tag-chip" onclick="removeCategoryFromModal('${esc(c)}')" title="Click to remove">${esc(c)} ×</span>`).join('');
+
+  const cur = inv.currency || 'USD';
+  setText('m-subtotal', cur + ' ' + fmt$(inv.subtotal));
+  setText('m-tax',      cur + ' ' + fmt$(inv.tax_amount));
+  setText('m-total',    cur + ' ' + fmt$(inv.total_amount));
+  setText('m-currency', cur);
+  setText('m-inv-date', fmtDate(inv.invoice_date));
+  setText('m-due-date', fmtDate(inv.due_date));
+  setText('m-terms',    inv.payment_terms || '—');
+  setText('m-addr',     inv.vendor_address || '—');
+  setText('m-email',    inv.vendor_email || '—');
+  setText('m-source',   inv.source_file || '—');
+
+  const pct = Math.round((inv.confidence_score || 0) * 100);
+  const bar = document.getElementById('m-conf-bar');
+  bar.style.width = pct + '%';
+  bar.className = `h-2 rounded-full ${confColor(inv.confidence_score)}`;
+  setText('m-conf-pct', pct + '%');
+
+  const items = inv.line_items || [];
+  document.getElementById('m-line-items').innerHTML = items.length
+    ? items.map(li => `<tr class="border-b last:border-0"><td class="px-3 py-2 text-gray-700">${esc(li.description)}</td><td class="px-3 py-2 text-right text-gray-500">${li.quantity}</td><td class="px-3 py-2 text-right text-gray-500">${fmt$(li.unit_price)}</td><td class="px-3 py-2 text-right font-medium text-gray-800">${fmt$(li.total)}</td></tr>`).join('')
+    : `<tr><td colspan="4" class="px-3 py-4 text-center text-gray-400 text-xs">No line items</td></tr>`;
+
+  const flagsSection = document.getElementById('m-flags-section');
+  if (inv.flags?.length) {
+    flagsSection.classList.remove('hidden');
+    document.getElementById('m-flags').innerHTML = inv.flags.map(f =>
+      `<span class="inline-block bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full">${esc(f)}</span>`
+    ).join('');
+  } else {
+    flagsSection.classList.add('hidden');
+  }
+
+  // Categories in overview
+  const catsEl = document.getElementById('m-cats');
+  catsEl.innerHTML = (inv.categories||[]).map(c =>
+    `<span class="tag-chip cursor-pointer" onclick="removeCategoryFromModal('${esc(c)}')">${esc(c)} ×</span>`
+  ).join('') || '<span class="text-xs text-gray-400">No categories</span>';
+
+  renderModalStatusActions(inv.status);
+  setModalTab('overview');
+  document.getElementById('modal-backdrop').classList.remove('hidden');
+  document.body.classList.add('overflow-hidden');
+
+  loadNotes(invNum);
+  loadAudit(invNum);
+}
+
+function renderModalStatusActions(current) {
+  const colors = { pending:'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+    under_review:'bg-purple-100 text-purple-800 hover:bg-purple-200',
+    approved:'bg-green-100 text-green-800 hover:bg-green-200',
+    flagged:'bg-red-100 text-red-800 hover:bg-red-200',
+    paid:'bg-blue-100 text-blue-800 hover:bg-blue-200',
+    overdue:'bg-pink-100 text-pink-800 hover:bg-pink-200' };
+  document.getElementById('m-status-actions').innerHTML =
+    ['pending','under_review','approved','flagged','paid','overdue']
+      .filter(s => s !== current)
+      .map(s => `<button onclick="updateStatus('${esc(S.modalInvNum)}','${s}',true)"
+        class="text-xs font-medium px-3 py-1.5 rounded-full transition ${colors[s]}">Mark ${statusLabel(s)}</button>`).join('');
+}
+
+function closeModal(event) {
+  if (event && event.target !== document.getElementById('modal-backdrop')) return;
+  _closeModal();
+}
+function _closeModal() {
+  document.getElementById('modal-backdrop').classList.add('hidden');
+  document.body.classList.remove('overflow-hidden');
+  S.modalInvNum = null;
+}
+
+function setModalTab(tab) {
+  const tabs = ['overview','preview','notes','history'];
+  S.modalTab = tab;
+  tabs.forEach(t => {
+    document.getElementById('modal-tab-' + t)?.classList.toggle('hidden', t !== tab);
+    const btn = document.getElementById('mtab-' + t);
+    if (!btn) return;
+    btn.classList.toggle('modal-tab-active', t === tab);
+    btn.classList.toggle('border-blue-600', t === tab);
+    btn.classList.toggle('text-blue-600', t === tab);
+    btn.classList.toggle('border-transparent', t !== tab);
+    btn.classList.toggle('text-gray-500', t !== tab);
+  });
+  if (tab === 'preview') loadPreview(S.modalInvNum);
+}
+
+async function loadPreview(invNum) {
+  const container = document.getElementById('preview-container');
+  if (!invNum) return;
+  try {
+    const res = await fetch(`/api/invoices/${encodeURIComponent(invNum)}/file`, { method: 'HEAD' });
+    if (!res.ok) {
+      container.innerHTML = `<div class="flex items-center justify-center h-64 text-gray-400 text-sm"><div class="text-center"><div class="text-4xl mb-2">📄</div><p>Original file not stored</p><p class="text-xs mt-1">Files are stored when uploaded via the UI</p></div></div>`;
+      return;
+    }
+    const ct = res.headers.get('content-type') || '';
+    const url = `/api/invoices/${encodeURIComponent(invNum)}/file`;
+    if (ct.includes('pdf')) {
+      container.innerHTML = `<iframe src="${url}" class="w-full" style="height:500px" frameborder="0"></iframe>`;
+    } else if (ct.startsWith('image/')) {
+      container.innerHTML = `<img src="${url}" class="w-full object-contain max-h-[500px]" alt="Invoice preview">`;
+    } else {
+      container.innerHTML = `<div class="flex items-center justify-center h-64 text-gray-400 text-sm"><div class="text-center"><p>Cannot preview this file type</p><a href="${url}" target="_blank" class="text-blue-600 hover:underline text-sm mt-1 block">Download file</a></div></div>`;
+    }
+  } catch {
+    container.innerHTML = `<div class="flex items-center justify-center h-64 text-gray-400 text-sm"><p>Failed to load preview</p></div>`;
+  }
+}
+
+// ══ Categories ═══════════════════════════════════════════════════════════════
+async function addCategory() {
+  const input = document.getElementById('cat-input');
+  const cat = input.value.trim();
+  if (!cat || !S.modalInvNum) return;
+  const inv = S.invoices.find(i => i.invoice_number === S.modalInvNum);
+  if (!inv) return;
+  const cats = [...new Set([...(inv.categories||[]), cat])];
+  try {
+    const res = await fetch(`/api/invoices/${encodeURIComponent(S.modalInvNum)}/categories`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ categories: cats })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      inv.categories = data.categories;
+      input.value = '';
+      // refresh modal tags
+      const tagsEl = document.getElementById('modal-tags');
+      tagsEl.innerHTML = inv.categories.map(c => `<span class="tag-chip cursor-pointer" onclick="removeCategoryFromModal('${esc(c)}')" title="Click to remove">${esc(c)} ×</span>`).join('');
+      const catsEl = document.getElementById('m-cats');
+      catsEl.innerHTML = inv.categories.map(c =>
+        `<span class="tag-chip cursor-pointer" onclick="removeCategoryFromModal('${esc(c)}')">${esc(c)} ×</span>`
+      ).join('') || '<span class="text-xs text-gray-400">No categories</span>';
+    }
+  } catch {}
+}
+
+async function removeCategoryFromModal(cat) {
+  if (!S.modalInvNum) return;
+  const inv = S.invoices.find(i => i.invoice_number === S.modalInvNum);
+  if (!inv) return;
+  const cats = (inv.categories||[]).filter(c => c !== cat);
+  try {
+    const res = await fetch(`/api/invoices/${encodeURIComponent(S.modalInvNum)}/categories`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ categories: cats })
+    });
+    if (res.ok) {
+      inv.categories = cats;
+      const tagsEl = document.getElementById('modal-tags');
+      tagsEl.innerHTML = inv.categories.map(c => `<span class="tag-chip cursor-pointer" onclick="removeCategoryFromModal('${esc(c)}')" title="Click to remove">${esc(c)} ×</span>`).join('');
+      const catsEl = document.getElementById('m-cats');
+      catsEl.innerHTML = inv.categories.map(c =>
+        `<span class="tag-chip cursor-pointer" onclick="removeCategoryFromModal('${esc(c)}')">${esc(c)} ×</span>`
+      ).join('') || '<span class="text-xs text-gray-400">No categories</span>';
+      renderInvoices();
+    }
+  } catch {}
+}
+
+// ══ Notes ═════════════════════════════════════════════════════════════════════
+async function loadNotes(invNum) {
+  try {
+    const notes = await (await fetch(`/api/invoices/${encodeURIComponent(invNum)}/notes`)).json();
+    const el2 = document.getElementById('notes-list');
+    if (!notes.length) { el2.innerHTML = '<p class="text-gray-400 text-sm text-center py-6">No notes yet.</p>'; return; }
+    el2.innerHTML = notes.map(n => `
+      <div class="flex items-start gap-2 bg-gray-50 rounded-lg p-3">
+        <div class="flex-1"><p class="text-sm text-gray-700">${esc(n.content)}</p><p class="text-xs text-gray-400 mt-1">${new Date(n.created_at).toLocaleString()}</p></div>
+        <button onclick="deleteNote(${n.id},'${esc(invNum)}')" class="text-gray-300 hover:text-red-400 transition mt-0.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>`).join('');
+  } catch {}
+}
+
+async function addNote() {
+  const input = document.getElementById('note-input');
+  const content = input.value.trim();
+  if (!content || !S.modalInvNum) return;
+  try {
+    await fetch(`/api/invoices/${encodeURIComponent(S.modalInvNum)}/notes`, {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ content }),
+    });
+    input.value = '';
+    loadNotes(S.modalInvNum);
+  } catch { showToast('Failed to add note'); }
+}
+
+async function deleteNote(noteId, invNum) {
+  await fetch(`/api/invoices/${encodeURIComponent(invNum)}/notes/${noteId}`, { method: 'DELETE' });
+  loadNotes(invNum);
+}
+
+// ══ Audit ═════════════════════════════════════════════════════════════════════
+async function loadAudit(invNum) {
+  try {
+    const log = await (await fetch(`/api/invoices/${encodeURIComponent(invNum)}/audit`)).json();
+    const el2 = document.getElementById('audit-list');
+    if (!log.length) { el2.innerHTML = '<p class="text-gray-400 text-sm text-center py-6">No history yet.</p>'; return; }
+    const pillColors = { pending:'pill-pending', under_review:'pill-under_review', flagged:'pill-flagged', approved:'pill-approved', paid:'pill-paid', overdue:'pill-overdue' };
+    el2.innerHTML = log.map(e => `
+      <div class="flex items-start gap-3">
+        <div class="flex flex-col items-center"><div class="w-2 h-2 rounded-full bg-blue-500 mt-1.5"></div><div class="w-px flex-1 bg-gray-200 my-1"></div></div>
+        <div class="pb-3 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            ${e.old_status ? `<span class="text-xs px-2 py-0.5 rounded-full font-medium ${pillColors[e.old_status]||''}">${statusLabel(e.old_status)}</span><span class="text-gray-400 text-xs">→</span>` : ''}
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium ${pillColors[e.new_status]||''}">${statusLabel(e.new_status)}</span>
+            <span class="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">${e.trigger}</span>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">${new Date(e.created_at).toLocaleString()}</p>
+        </div>
+      </div>`).join('');
+  } catch {}
+}
+
+// ══ Selection & bulk ══════════════════════════════════════════════════════════
+function toggleSelect(invNum, checked) {
+  if (checked) S.selected.add(invNum); else S.selected.delete(invNum);
+  updateBulkBar(); renderInvoices();
+}
+function toggleSelectAll(checked) {
+  getVisible().forEach(inv => checked ? S.selected.add(inv.invoice_number) : S.selected.delete(inv.invoice_number));
+  updateBulkBar(); renderInvoices();
+}
+function clearSelection() {
+  S.selected.clear();
+  const sa = document.getElementById('select-all');
+  if (sa) sa.checked = false;
+  updateBulkBar(); renderInvoices();
+}
+function updateBulkBar() {
+  const bar = document.getElementById('bulk-bar');
+  const n   = S.selected.size;
+  bar.classList.toggle('hidden', n === 0);
+  setText('bulk-count', `${n} invoice${n!==1?'s':''} selected`);
+}
+async function bulkAction(status) {
+  if (!S.selected.size) return;
+  await fetch('/api/invoices/bulk-status', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({invoice_numbers:[...S.selected], status}) });
+  showSuccess(`Marked ${S.selected.size} as ${statusLabel(status)}`);
+  clearSelection(); loadAll();
+}
+async function bulkDelete() {
+  if (!S.selected.size || !confirm(`Delete ${S.selected.size} invoice(s)?`)) return;
+  await fetch('/api/invoices/bulk', { method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({invoice_numbers:[...S.selected]}) });
+  showSuccess(`Deleted ${S.selected.size} invoices`);
+  clearSelection(); loadAll();
+}
+
+// ══ Actions ═══════════════════════════════════════════════════════════════════
+async function updateStatus(invNum, newStatus, fromModal = false) {
+  const res = await fetch(`/api/invoices/${encodeURIComponent(invNum)}/status`, {
+    method: 'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status: newStatus}),
+  });
+  if (!res.ok) { showToast('Failed to update status'); return; }
+  await loadAll();
+  showSuccess(`${invNum} → ${statusLabel(newStatus)}`);
+  if (fromModal) {
+    const inv = S.invoices.find(i => i.invoice_number === invNum);
+    if (inv) {
+      const badge = document.getElementById('modal-status-badge');
+      badge.textContent = statusLabel(inv.status);
+      badge.className = `text-xs px-2 py-0.5 rounded-full font-medium pill-${inv.status}`;
+      renderModalStatusActions(inv.status);
+      loadAudit(invNum);
+    }
+  }
+}
+
+async function triggerProcessing() {
+  try {
+    const res = await fetch('/api/process', { method: 'POST' });
+    if (res.status === 409) { showToast('Already running'); return; }
+    if (!res.ok) { const e = await res.json(); showToast(e.detail || 'Failed'); return; }
+    loadAll();
+  } catch { showToast('Network error'); }
+}
+
+async function uploadFile(file) {
+  if (!file) return;
+  const lbl = document.getElementById('upload-status');
+  lbl.textContent = `Uploading ${file.name}…`; lbl.classList.remove('hidden','text-red-500','text-gray-500'); lbl.classList.add('text-blue-600');
+  const form = new FormData(); form.append('file', file);
+  try {
+    const res = await fetch('/api/upload', { method:'POST', body: form });
+    if (!res.ok) { const e = await res.json(); lbl.textContent = '✗ ' + (e.detail||'Failed'); lbl.classList.replace('text-blue-600','text-red-500'); return; }
+    const inv = await res.json();
+    lbl.textContent = `✓ ${inv.vendor_name} — $${fmt$(inv.total_amount)}`;
+    lbl.classList.replace('text-blue-600','text-gray-500');
+    loadAll();
+  } catch { lbl.textContent = '✗ Network error'; lbl.classList.replace('text-blue-600','text-red-500'); }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-label')?.classList.remove('drop-active');
+  if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+}
+
+async function batchUpload(files) {
+  if (!files?.length) return;
+  const prog = document.getElementById('batch-progress');
+  const list = document.getElementById('batch-list');
+  prog.classList.remove('hidden');
+  const items = [...files].map(f => ({ name: f.name, status: 'pending' }));
+  const renderList = () => {
+    list.innerHTML = items.map(it => {
+      const icon = it.status === 'ok' ? '✓' : it.status === 'error' ? '✗' : '⋯';
+      const color = it.status === 'ok' ? 'text-green-600' : it.status === 'error' ? 'text-red-500' : 'text-blue-500';
+      return `<div class="flex items-center gap-2 text-sm"><span class="${color} w-4">${icon}</span><span class="text-gray-700 truncate flex-1">${esc(it.name)}</span>${it.result ? `<span class="text-gray-400 text-xs">${esc(it.result)}</span>` : ''}</div>`;
+    }).join('');
+  };
+  renderList();
+
+  const form = new FormData();
+  [...files].forEach(f => form.append('files', f));
+  try {
+    const res = await fetch('/api/upload/batch', { method:'POST', body: form });
+    if (!res.ok) { showToast('Batch upload failed'); return; }
+    const data = await res.json();
+    data.results.forEach((r, i) => {
+      items[i].status = r.status;
+      items[i].result = r.status === 'ok' ? `$${fmt$(r.invoice?.total_amount||0)}` : r.error;
+    });
+    renderList();
+    showSuccess(`Processed ${data.ok}/${data.total} invoices`);
+    loadAll();
+  } catch { showToast('Batch upload failed'); }
+  setTimeout(() => prog.classList.add('hidden'), 5000);
+}
+
+async function deleteInvoice(invNum) {
+  if (!confirm(`Delete invoice ${invNum}?`)) return;
+  const res = await fetch(`/api/invoices/${encodeURIComponent(invNum)}`, { method:'DELETE' });
+  if (res.ok) { if (S.modalInvNum === invNum) _closeModal(); loadAll(); }
+  else showToast('Delete failed');
+}
+
+function exportCSV() {
+  const rows = getVisible();
+  if (!rows.length) { showToast('Nothing to export'); return; }
+  const cols = ['invoice_number','vendor_name','total_amount','currency','invoice_date','due_date','status','confidence_score','categories','flags'];
+  const headers = ['Invoice #','Vendor','Amount','Currency','Date','Due Date','Status','Confidence','Categories','Flags'];
+  const csv = [headers.join(','), ...rows.map(inv =>
+    cols.map(c => { let v = inv[c]; if (Array.isArray(v)) v = v.join('; '); return '"' + String(v??'').replace(/"/g,'""') + '"'; }).join(',')
+  )].join('\n');
+  dlBlob(csv, 'text/csv', `invoices-${today()}.csv`);
+}
+
+function exportAccounting() {
+  window.open('/api/export/accounting?format=quickbooks', '_blank');
+}
+
+// ══ Advanced filters ══════════════════════════════════════════════════════════
+function toggleFilterPanel() {
+  const panel = document.getElementById('filter-panel');
+  panel.classList.toggle('hidden');
+  document.getElementById('btn-filter').classList.toggle('bg-blue-50', !panel.classList.contains('hidden'));
+}
+
+function applyAdvFilters() {
+  S.advFilters.dateFrom = document.getElementById('f-date-from')?.value || '';
+  S.advFilters.dateTo   = document.getElementById('f-date-to')?.value || '';
+  S.advFilters.amtMin   = document.getElementById('f-amt-min')?.value || '';
+  S.advFilters.amtMax   = document.getElementById('f-amt-max')?.value || '';
+  S.advFilters.category = document.getElementById('f-category')?.value || '';
+  S.advFilters.flags    = document.getElementById('f-flags')?.value || '';
+  renderInvoices();
+}
+
+function clearAdvFilters() {
+  ['f-date-from','f-date-to','f-amt-min','f-amt-max','f-category'].forEach(id => { const el2 = document.getElementById(id); if (el2) el2.value = ''; });
+  const fs = document.getElementById('f-flags'); if (fs) fs.value = '';
+  S.advFilters = { dateFrom:'', dateTo:'', amtMin:'', amtMax:'', category:'', flags:'' };
+  renderInvoices();
+}
+
+async function saveCurrentFilter() {
+  const name = prompt('Save filter as:');
+  if (!name) return;
+  const filterData = JSON.stringify({ ...S.advFilters, statusFilter: S.filter, search: S.search });
+  try {
+    await fetch('/api/filters', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, filter_json: filterData }) });
+    await loadSavedFilters();
+    showSuccess(`Filter "${name}" saved`);
+  } catch { showToast('Failed to save filter'); }
+}
+
+function renderSavedFilterStrip() {
+  const strip = document.getElementById('saved-filter-strip');
+  if (!strip) return;
+  if (!S.savedFilters.length) { strip.classList.add('hidden'); return; }
+  strip.classList.remove('hidden');
+  strip.innerHTML = `<span class="text-xs text-gray-400 mr-1">Saved:</span>` +
+    S.savedFilters.map(f => `
+      <span class="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-2.5 py-0.5 cursor-pointer hover:bg-blue-100" onclick="applyFilter(${f.id})">
+        ${esc(f.name)}
+        <button onclick="event.stopPropagation();deleteFilter(${f.id})" class="text-blue-400 hover:text-red-500">×</button>
+      </span>`).join('');
+}
+
+function applyFilter(filterId) {
+  const f = S.savedFilters.find(sf => sf.id === filterId);
+  if (!f) return;
+  try {
+    const d = JSON.parse(f.filter_json);
+    if (d.dateFrom)  { document.getElementById('f-date-from').value = d.dateFrom; }
+    if (d.dateTo)    { document.getElementById('f-date-to').value   = d.dateTo; }
+    if (d.amtMin)    { document.getElementById('f-amt-min').value   = d.amtMin; }
+    if (d.amtMax)    { document.getElementById('f-amt-max').value   = d.amtMax; }
+    if (d.category)  { document.getElementById('f-category').value  = d.category; }
+    if (d.flags)     { document.getElementById('f-flags').value     = d.flags; }
+    S.advFilters = { dateFrom: d.dateFrom||'', dateTo: d.dateTo||'', amtMin: d.amtMin||'', amtMax: d.amtMax||'', category: d.category||'', flags: d.flags||'' };
+    if (d.statusFilter) setFilter(d.statusFilter);
+    if (d.search) { document.getElementById('search-input').value = d.search; S.search = d.search; }
+    document.getElementById('filter-panel').classList.remove('hidden');
+    renderInvoices();
+    showSuccess(`Applied filter: ${f.name}`);
+  } catch {}
+}
+
+async function deleteFilter(filterId) {
+  await fetch(`/api/filters/${filterId}`, { method:'DELETE' });
+  await loadSavedFilters();
+}
+
+// ══ Settings: Budgets ═════════════════════════════════════════════════════════
+async function saveBudget() {
+  const name = document.getElementById('b-name')?.value?.trim();
+  const scope = document.getElementById('b-scope')?.value;
+  const limit = parseFloat(document.getElementById('b-limit')?.value);
+  if (!name || !limit || limit <= 0) { showToast('Name and valid limit required'); return; }
+  try {
+    await fetch('/api/budgets', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, scope: scope||'global', monthly_limit: limit }) });
+    document.getElementById('b-name').value = '';
+    document.getElementById('b-limit').value = '';
+    toggleEl('budget-form');
+    await loadSettings();
+    showSuccess('Budget saved');
+  } catch { showToast('Failed to save budget'); }
+}
+
+async function deleteBudget(id) {
+  await fetch(`/api/budgets/${id}`, { method:'DELETE' });
+  await loadSettings();
+  showSuccess('Budget deleted');
+}
+
+// ══ Settings: Webhooks ════════════════════════════════════════════════════════
+async function saveWebhook() {
+  const name = document.getElementById('w-name')?.value?.trim();
+  const url  = document.getElementById('w-url')?.value?.trim();
+  if (!name || !url) { showToast('Name and URL required'); return; }
+  const events = [];
+  if (document.getElementById('we-all')?.checked)     events.push('all');
+  if (document.getElementById('we-created')?.checked) events.push('invoice_created');
+  if (document.getElementById('we-status')?.checked)  events.push('status_changed');
+  try {
+    await fetch('/api/webhooks', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name, url, events: events.length ? events : ['all'] }) });
+    document.getElementById('w-name').value = '';
+    document.getElementById('w-url').value = '';
+    toggleEl('webhook-form');
+    await loadSettings();
+    showSuccess('Webhook saved');
+  } catch { showToast('Failed to save webhook'); }
+}
+
+async function deleteWebhook(id) {
+  await fetch(`/api/webhooks/${id}`, { method:'DELETE' });
+  await loadSettings();
+}
+
+async function toggleWebhook(id, enabled) {
+  await fetch(`/api/webhooks/${id}/toggle`, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ enabled }) });
+}
+
+async function testWebhook() {
+  const url = document.getElementById('w-url')?.value?.trim();
+  if (!url) { showToast('Enter a URL first'); return; }
+  try {
+    const res = await fetch('/api/webhooks/test', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url }) });
+    const data = await res.json();
+    if (data.ok) showSuccess(`Test sent — HTTP ${data.status_code}`);
+    else showToast('Test failed: ' + (data.error || 'Unknown error'));
+  } catch { showToast('Test failed'); }
+}
+
+// ══ Sort & filter ══════════════════════════════════════════════════════════════
+function setSort(col) {
+  S.sort.dir = S.sort.col === col && S.sort.dir === 'asc' ? 'desc' : 'asc';
+  S.sort.col = col;
+  ['vendor_name','invoice_number','total_amount','invoice_date','due_date','confidence_score'].forEach(c => {
+    const el2 = document.getElementById('sort-' + c);
+    if (!el2) return;
+    el2.textContent = S.sort.col === c ? (S.sort.dir === 'asc' ? '↑' : '↓') : '';
+    el2.closest('th')?.classList.toggle('sort-active', S.sort.col === c);
+  });
+  renderInvoices();
+}
+
+function setFilter(f) {
+  S.filter = f;
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const active = btn.id === 'tab-' + f;
+    btn.classList.toggle('border-blue-600', active); btn.classList.toggle('text-blue-600', active);
+    btn.classList.toggle('border-transparent', !active); btn.classList.toggle('text-gray-500', !active);
+  });
+  renderInvoices();
+}
+
+function onSearch(val) { S.search = val.trim(); renderInvoices(); }
+
+// ══ Dark mode ══════════════════════════════════════════════════════════════════
+function toggleDark() {
+  S.dark = !S.dark;
+  localStorage.setItem('dark', S.dark ? '1' : '0');
+  applyDark();
+  if (S.view === 'analytics' && S.analytics) renderAnalytics();
+}
+function applyDark() {
+  document.documentElement.classList.toggle('dark', S.dark);
+  document.getElementById('icon-sun').classList.toggle('hidden', !S.dark);
+  document.getElementById('icon-moon').classList.toggle('hidden', S.dark);
+}
+
+// ══ Command Palette ═══════════════════════════════════════════════════════════
+const CMD_ACTIONS = [
+  { label:'Dashboard',           fn:"setView('dashboard')",  icon:'⊞', kbd:'1' },
+  { label:'Calendar',            fn:"setView('calendar')",   icon:'📅', kbd:'2' },
+  { label:'Kanban Board',        fn:"setView('kanban')",     icon:'🗂', kbd:'3' },
+  { label:'Analytics',           fn:"setView('analytics')",  icon:'📈', kbd:'4' },
+  { label:'Vendors',             fn:"setView('vendors')",    icon:'🏢', kbd:'5' },
+  { label:'Aging Report',        fn:"setView('aging')",      icon:'⏰', kbd:'6' },
+  { label:'Settings',            fn:"setView('settings')",   icon:'⚙️', kbd:'7' },
+  { label:'Export CSV',          fn:'exportCSV()',           icon:'⬇️' },
+  { label:'Export QuickBooks',   fn:'exportAccounting()',    icon:'📊' },
+  { label:'Toggle Dark Mode',    fn:'toggleDark()',          icon:'🌙' },
+  { label:'Run Processing Cycle',fn:'triggerProcessing()',   icon:'🔄' },
+  { label:'Upload Invoice',      fn:"document.getElementById('upload-input').click()", icon:'📤' },
+  { label:'Filter Panel',        fn:'toggleFilterPanel()',   icon:'🔍' },
+  { label:'Go to API docs',      fn:"window.open('/docs','_blank')", icon:'📖' },
+];
+
+let _cmdSelected = 0;
+function openCmdPalette() {
+  document.getElementById('cmd-backdrop').classList.remove('hidden');
+  const input = document.getElementById('cmd-input');
+  input.value = '';
+  renderCmdResults('');
+  setTimeout(() => input.focus(), 50);
+}
+function closeCmdPalette() {
+  document.getElementById('cmd-backdrop').classList.add('hidden');
+}
+function renderCmdResults(q) {
+  const matchActions = q
+    ? CMD_ACTIONS.filter(a => a.label.toLowerCase().includes(q.toLowerCase()))
+    : CMD_ACTIONS;
+  const matchInvoices = q
+    ? S.invoices.filter(i => (i.vendor_name||'').toLowerCase().includes(q.toLowerCase()) || (i.invoice_number||'').toLowerCase().includes(q.toLowerCase())).slice(0, 5)
+    : [];
+
+  let html = '';
+  if (matchActions.length) {
+    html += `<p class="cmd-section px-4 py-1.5">Actions</p>`;
+    html += matchActions.map((a, i) => `
+      <button class="cmd-item w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition" onclick="${a.fn};closeCmdPalette()">
+        <span class="text-base w-5 text-center flex-shrink-0">${a.icon}</span>
+        <span class="flex-1 text-sm text-gray-700">${esc(a.label)}</span>
+        ${a.kbd ? `<kbd class="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono text-gray-400">${a.kbd}</kbd>` : ''}
+      </button>`).join('');
+  }
+  if (matchInvoices.length) {
+    html += `<p class="cmd-section px-4 py-1.5 border-t mt-1">Invoices</p>`;
+    html += matchInvoices.map(inv => `
+      <button class="cmd-item w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition" onclick="openModal('${esc(inv.invoice_number)}');closeCmdPalette()">
+        <span class="text-xs font-mono text-gray-400 w-20 flex-shrink-0 truncate">#${esc(inv.invoice_number)}</span>
+        <span class="flex-1 text-sm text-gray-700">${esc(inv.vendor_name)}</span>
+        <span class="text-sm font-semibold text-gray-900">$${fmt$(inv.total_amount)}</span>
+      </button>`).join('');
+  }
+  if (!html) html = `<p class="text-center text-gray-400 text-sm py-8">No results for "${esc(q)}"</p>`;
+  document.getElementById('cmd-results').innerHTML = html;
+}
+function onCmdKey(e) {
+  if (e.key === 'Escape') { closeCmdPalette(); e.preventDefault(); }
+  if (e.key === 'Enter') {
+    const first = document.querySelector('#cmd-results .cmd-item');
+    if (first) first.click();
+  }
+}
+
+// ══ Keyboard shortcuts ════════════════════════════════════════════════════════
+function onKey(e) {
+  const tag = e.target.tagName;
+  const typing = tag === 'INPUT' || tag === 'TEXTAREA';
+  if (e.key === 'Escape') {
+    _closeModal();
+    document.getElementById('kbd-help').classList.add('hidden');
+    closeCmdPalette();
+    document.getElementById('cal-popover')?.classList.add('hidden');
+    return;
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openCmdPalette(); return; }
+  if (typing) return;
+  if (e.key === '/') { e.preventDefault(); document.getElementById('search-input')?.focus(); }
+  if (e.key === '?') document.getElementById('kbd-help').classList.toggle('hidden');
+  if (e.key === '1') setView('dashboard');
+  if (e.key === '2') setView('calendar');
+  if (e.key === '3') setView('kanban');
+  if (e.key === '4') setView('analytics');
+  if (e.key === '5') setView('vendors');
+  if (e.key === '6') setView('aging');
+  if (e.key === '7') setView('settings');
+}
+
+// ══ Utilities ══════════════════════════════════════════════════════════════════
+function setText(id, val) { const e = document.getElementById(id); if (e) e.textContent = val; }
+function el(id) { return document.getElementById(id); }
+function fmt$(n) { return Number(n||0).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
+function fmtDate(d) { if (!d) return '—'; return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }); }
+function today() { return new Date().toISOString().slice(0,10); }
+function confColor(s) { if (!s) return 'bg-gray-400'; if (s>=0.85) return 'bg-green-500'; if (s>=0.70) return 'bg-yellow-400'; return 'bg-red-400'; }
+function esc(str) { return String(str||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toggleEl(id) { document.getElementById(id)?.classList.toggle('hidden'); }
+function setStatusDot(ok) {
+  document.getElementById('dot').className = `w-2 h-2 rounded-full ${ok ? 'bg-green-500' : 'bg-red-400'}`;
+  setText('status-text', ok ? 'Connected' : 'Offline');
+}
+function dlBlob(content, type, filename) {
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([content], { type })), download: filename });
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+let _errTimer, _okTimer;
+function showToast(msg, ms=4000) {
+  document.getElementById('toast-success').classList.add('hidden');
+  const e = document.getElementById('toast'); e.textContent = msg; e.classList.remove('hidden');
+  clearTimeout(_errTimer); _errTimer = setTimeout(() => e.classList.add('hidden'), ms);
+}
+function showSuccess(msg, ms=3000) {
+  document.getElementById('toast').classList.add('hidden');
+  const e = document.getElementById('toast-success'); e.textContent = msg; e.classList.remove('hidden');
+  clearTimeout(_okTimer); _okTimer = setTimeout(() => e.classList.add('hidden'), ms);
+}
+</script>
+</body>
+</html>

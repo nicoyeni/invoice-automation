@@ -1,0 +1,87 @@
+# Invoice Automation Configuration
+# Copy this to config.yaml and fill in your values
+
+# Google API credentials
+google:
+  credentials_file: "config/credentials.json"
+  token_file: "config/token.json"
+  # Scopes needed
+  scopes:
+    - "https://www.googleapis.com/auth/gmail.readonly"
+    - "https://www.googleapis.com/auth/gmail.send"
+    - "https://www.googleapis.com/auth/spreadsheets"
+    - "https://www.googleapis.com/auth/drive.readonly"
+
+# Gemini AI settings
+gemini:
+  api_key: "YOUR_GEMINI_API_KEY"
+  model: "gemini-2.5-pro"  # or gemini-2.0-flash for cheaper/faster
+  max_retries: 3
+
+# Gmail watching
+gmail:
+  # Label to watch for invoices (create this label in Gmail)
+  watch_label: "Invoices"
+  # Or watch all inbox and filter by subject/sender
+  search_query: "has:attachment filename:pdf OR filename:png OR filename:jpg subject:(invoice OR bill OR statement)"
+  poll_interval_seconds: 300  # Check every 5 minutes
+  mark_as_processed: true  # Add a "Processed" label after extraction
+
+# Google Drive watching (alternative to Gmail)
+drive:
+  enabled: false
+  folder_id: "YOUR_DRIVE_FOLDER_ID"  # The folder to watch
+  poll_interval_seconds: 300
+
+# Google Sheets output
+sheets:
+  spreadsheet_id: "YOUR_SPREADSHEET_ID"
+  sheet_name: "Invoices"
+  # Column mapping (which Sheet column gets which invoice field)
+  columns:
+    - field: "invoice_date"
+      header: "Date"
+    - field: "invoice_number"
+      header: "Invoice #"
+    - field: "vendor_name"
+      header: "Vendor"
+    - field: "total_amount"
+      header: "Amount"
+    - field: "currency"
+      header: "Currency"
+    - field: "due_date"
+      header: "Due Date"
+    - field: "payment_terms"
+      header: "Terms"
+    - field: "status"
+      header: "Status"
+    - field: "confidence_score"
+      header: "AI Confidence"
+    - field: "flags"
+      header: "Flags"
+    - field: "source_file"
+      header: "Source File"
+
+# Anomaly detection
+anomaly:
+  # Flag if total exceeds this amount
+  high_amount_threshold: 10000
+  # Flag if duplicate invoice number found
+  check_duplicates: true
+  # Flag if confidence below this
+  low_confidence_threshold: 0.7
+
+# Payment reminders
+reminders:
+  enabled: true
+  # Days before due date to send first reminder
+  first_reminder_days: 7
+  # Days after due date to send overdue notice
+  overdue_reminder_days: 1
+  # Email to send reminders from (must be the authenticated Gmail)
+  from_name: "Accounts Payable"
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "logs/automation.log"
