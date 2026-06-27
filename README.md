@@ -1,5 +1,9 @@
 # Invoice Processing Automation
 
+[![CI](https://github.com/nicoyeni/invoice-automation/actions/workflows/ci.yml/badge.svg)](https://github.com/nicoyeni/invoice-automation/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)
+
 AI-powered invoice processing pipeline for small businesses. Watches Gmail/Google Drive for incoming invoices, extracts structured data using Gemini/Claude, and pushes results to Google Sheets — replacing manual data entry.
 
 ## Architecture

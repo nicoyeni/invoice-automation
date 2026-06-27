@@ -427,6 +427,7 @@ async def upload_invoice(file: UploadFile = File(...)):
 
         # Store file for preview
         safe_num = _safe_filename(invoice.invoice_number or "unknown")
+        FILES_DIR.mkdir(parents=True, exist_ok=True)
         dest = FILES_DIR / f"{safe_num}{suffix}"
         shutil.copy(tmp_path, str(dest))
 
@@ -469,6 +470,7 @@ async def batch_upload(files: list[UploadFile] = File(...)):
             detector = _make_detector(config, existing, _invoices)
             invoice  = detector.check(invoice)
             safe_num = _safe_filename(invoice.invoice_number or "unknown")
+            FILES_DIR.mkdir(parents=True, exist_ok=True)
             shutil.copy(tmp_path, str(FILES_DIR / f"{safe_num}{suffix}"))
             _invoices.append(invoice)
             _db_save(invoice)
