@@ -138,7 +138,7 @@ gmail:
 drive:
   enabled: false
 sheets:
-  spreadsheet_id: 1XhTfeYekbnvx3cbmjX1UoI4mwmrpN41goG0k0nhddes
+  spreadsheet_id: YOUR_SPREADSHEET_ID
   sheet_name: Sheet1
 reminders:
   enabled: true
